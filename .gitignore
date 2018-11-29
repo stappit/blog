@@ -28,6 +28,8 @@ site
 _site
 _cache
 *.csv
+*.xlsx
+*.xls
 
 #########
 # LATEX 
