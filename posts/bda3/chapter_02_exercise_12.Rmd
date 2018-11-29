@@ -1,0 +1,110 @@
+---
+title: "BDA3 Chapter 2 Exercise 12"
+author: "Brian Callander"
+date: "2018-09-01"
+tags: bda chapter 2, solutions, bayes, poisson, jeffrey prior, gamma
+always_allow_html: yes
+output: 
+  md_document:
+    variant: markdown
+    preserve_yaml: yes
+---
+
+Here's my solution to exercise 12, chapter 2, of [Gelman's](https://andrewgelman.com/) *Bayesian Data Analysis* (BDA), 3rd edition. There are [solutions](http://www.stat.columbia.edu/~gelman/book/solutions.pdf) to some of the exercises on the [book's webpage](http://www.stat.columbia.edu/~gelman/book/).
+
+<!--more-->
+
+<div style="display:none">
+  $\DeclareMathOperator{\dbinomial}{binomial}
+   \DeclareMathOperator{\dbern}{Bernoulli}
+   \DeclareMathOperator{\dnorm}{normal}
+   \DeclareMathOperator{\dcauchy}{Cauchy}
+   \DeclareMathOperator{\dgamma}{gamma}
+   \DeclareMathOperator{\invlogit}{invlogit}
+   \DeclareMathOperator{\logit}{logit}
+   \DeclareMathOperator{\dbeta}{beta}$
+</div>
+
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(
+  echo = TRUE,
+  comment = NA,
+  message = FALSE,
+  warning = FALSE,
+  error = TRUE,
+  cache = TRUE
+)
+
+library(tidyverse)
+library(kableExtra)
+
+theme_set(theme_bw())
+
+```
+
+Suppose $\theta$ has a Poisson likelihood so that $\log p(y \mid \theta) \propto y \log(\theta) - \theta$. We will find Jeffrey's prior for $\theta$ and the gamma distribution that most closely approximates it.
+
+The derivative of the log likelihood is $\frac{y}{\theta} - 1$ and the second derivative is $-\frac{y}{\theta^2}$. It follows that the Fisher information for $\theta$ is
+
+$$
+J(\theta)
+=
+\mathbb E \left( \frac{y}{\theta^2} \right)
+=
+\frac{1}{\theta}
+,
+$$
+
+so Jeffrey's prior is $p(\theta) \propto \frac{1}{\sqrt{\theta}}$. This is an improper prior because
+
+$$
+\int_0^\infty \theta^{-\frac{1}{2}} d\theta
+=
+\left[ 2\theta^{\frac{1}{2}} \right]_0^\infty
+=
+\infty
+.
+$$
+
+Since Jeffrey's prior is improper, we can try approximate it with a gamma prior. Let $\alpha, \beta \in (0, \infty)$ be the shape and rate parameters of a gamma distribution.  Then
+
+$$
+\dgamma(\theta \mid \alpha, \beta) 
+\propto
+x^{\alpha - 1}e^{-\beta x}
+.
+$$
+
+Choosing $\alpha = \frac{1}{2}$ and $\beta = 0$ yields Jeffrey's prior. However, $\beta$ must be positive for the gamma distribution to be proper, so we can choose $\beta = \epsilon$ sufficiently small. We'll use the [smallest positive float](https://stat.ethz.ch/R-manual/R-devel/library/base/html/zMachine.html) representable in R.
+
+```{r gamma_jeffrey}
+epsilon <- .Machine$double.xmin
+
+upper_limit <- 100000000
+step <- upper_limit / 10000
+
+prior <- tibble(theta = seq(0, upper_limit, step)) %>% 
+  mutate(density = dgamma(theta, 0.5, epsilon)) 
+```
+
+```{r gamma_jeffrey_plot, echo = FALSE}
+prior %>% 
+  ggplot() +
+  aes(theta, density) +
+  geom_area(fill = 'skyblue') +
+  scale_x_continuous(labels = scales::comma) +
+  scale_y_continuous(labels = function(x) signif(x, 2), limits = c(0, NA)) +
+  labs(
+    x = 'θ',
+    y = 'Density',
+    title = str_glue("Gamma(0.5, {signif(epsilon, digits = 2)}) as an approximation of Jeffrey's Poisson prior"),
+    subtitle = str_glue(paste(
+      'Truncated above at {scales::comma(upper_limit)}',
+      'Calculated in steps of {scales::comma(step)}',
+      sep = '\n'
+    ))
+  )
+
+```
+

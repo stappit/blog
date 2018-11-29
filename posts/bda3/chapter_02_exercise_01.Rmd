@@ -1,0 +1,119 @@
+---
+title: "BDA3 Chapter 2 Exercise 1"
+author: "Brian Callander"
+date: "2018-08-20"
+tags: stan, beta, binomial, bayes, solutions, bda chapter 2, bda
+always_allow_html: yes
+output: 
+  md_document:
+    variant: markdown
+    preserve_yaml: yes
+---
+
+Here's my solution to exercise 1, chapter 2, of [Gelman's](https://andrewgelman.com/) *Bayesian Data Analysis* (BDA), 3rd edition. There are [solutions](http://www.stat.columbia.edu/~gelman/book/solutions.pdf) to some of the exercises on the [book's webpage](http://www.stat.columbia.edu/~gelman/book/).
+
+<!--more-->
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(
+  echo = TRUE,
+  comment = NA,
+  message = FALSE,
+  warning = TRUE,
+  error = TRUE,
+  cache = TRUE
+)
+
+library(tidyverse)
+library(rstan)
+library(tidybayes)
+library(kableExtra)
+
+theme_set(theme_bw())
+
+options(mc.cores = parallel::detectCores())
+rstan_options(auto_write = TRUE)
+
+```
+
+<div style="display:none">
+  $\DeclareMathOperator{\dbinomial}{binomial}
+   \DeclareMathOperator{\dbern}{Bernoulli}
+   \DeclareMathOperator{\dbeta}{beta}$
+</div>
+
+Let $H$ be the number of heads in 10 tosses of the coin. With a $\dbeta(4, 4)$ prior on the probability $\theta$ of a head, the posterior after finding out $H \le 2$ is
+
+$$
+\begin{align}
+  p(\theta \mid H \le 2)
+  &\propto
+  p(H \le 2 \mid \theta) \cdot p(\theta)
+  \\
+  &=
+  \dbeta(\theta \mid 4, 4) \sum_{h = 0}^2 \dbinomial(h \mid \theta, 10)
+  \\
+  &=
+  \theta^3 (1 - \theta)^3 \sum_{h = 0}^2 \binom{10}{h} \theta^h (1 - \theta)^{10 - h}.
+\end{align}
+$$
+
+We can plot this unnormalised posterior density from the following dataset.
+
+```{r ex1_data}
+ex1 <- tibble(
+         theta = seq(0, 1, 0.01), 
+         prior = theta^3 * (1 - theta)^3,
+         posterior = prior * (
+           choose(10, 0) * theta^0 * (1 - theta)^10 +
+           choose(10, 1) * theta^1 * (1 - theta)^9 +
+           choose(10, 2) * theta^2 * (1 - theta)^8 
+         )
+       )
+```
+
+```{r ex1_plot, echo = FALSE}
+ex1 %>% 
+  ggplot() +
+  aes(theta, posterior) +
+  geom_area(fill = 'skyblue', colour = 'black') +
+  labs(
+    x = 'θ',
+    y = 'Unnormalised probability density',
+    title = "p(θ | H < 3)"
+  )
+
+```
+
+With the help of [Stan](http://mc-stan.org/), we can obtain the normalised posterior density. We include the information that there are at most 2 heads observed by using the (log) cumulative density function.
+
+```{r ex1_stan_model_load, results='hide'}
+m1 <- rstan::stan_model('src/ex_02_01.stan')
+```
+
+```{r ex1_stan_model, echo = FALSE}
+m1
+```
+
+The following posterior has the same shape as our exact unnormalised density above. The difference is that we now have a normalised probability distribution without having to work out the maths ourselves.
+
+```{r ex1_stan_fit, results = 'hide'}
+f1 <- sampling(m1, iter = 40000, warmup = 500, chains = 1)
+```
+
+```{r ex1_stan_plot, echo = FALSE}
+f1 %>% 
+  spread_draws(theta) %>% 
+  ggplot() +
+  aes(theta) +
+  geom_density(fill = 'skyblue') +
+  scale_x_continuous(limits = c(0, 1)) +
+  labs(
+    x = 'θ',
+    y = 'Probability density',
+    title = "p(θ | H < 3)"
+  )
+  
+```
+
+

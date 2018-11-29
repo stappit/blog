@@ -1,0 +1,263 @@
+---
+title: "How to deal with right-censored observations"
+author: "Brian Callander"
+date: "2018-08-04"
+tags: censoring, stan, likelihood, survival, mle, poisson
+always_allow_html: yes
+output: 
+  md_document:
+    variant: markdown
+    preserve_yaml: true
+---
+
+
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(
+  echo = TRUE, 
+  cache = TRUE, 
+  comment = NA,
+  message = FALSE,
+  warning = TRUE,
+  error = TRUE,
+  knitr.table.format = 'html'
+)
+
+library(tidyverse)
+library(broom)
+library(scales)
+
+library(rstan)
+library(tidybayes)
+
+library(kableExtra)
+
+options(mc.cores = parallel::detectCores())
+rstan_options(auto_write = TRUE)
+```
+
+
+I've recently been interested in understanding survival models, which model the time to an event of interest (`tte`) but where we are not always able to wait until that event occurs. This happens, for example, when modelling the time until a customer [churns](https://en.wikipedia.org/wiki/Churn_rate): some of your customers may have cancelled their subscriptions but many hopefully haven't. Those that haven't are said to be `censored` because we haven't observed them cancel their subscription yet.
+
+<!--more-->
+
+As a first step in that direction, we'll take a look at modelling censoring when the `tte` has a Poisson distribution (minor modifications can be made to extend to other distributions). We'll use [Stan](http://mc-stan.org/) to implement our model since Bayesian notation very nicely reflects our statistical understanding. Don't worry if you aren't familiar with Stan or Bayesian inference - it should be possible to follow along regardless.
+
+You can download the [R markdown](./censoring.Rmd) and the [stan model](./censored_poisson.stan) to try it out.
+
+## Some theory
+
+
+### The Problem 
+
+```{r seed, include=FALSE}
+set.seed(165809)
+```
+
+Let's generate some data. We will assume that the time to event (`tte`) is poisson distributed with mean $\mu = 10$. However, we will also assume that we don't get to observe the event of interest in every case, i.e. some cases are censored. What we measure is the time to observation (`tto`).
+
+```{r dataset}
+N <- 10000
+mu <- 10
+
+df <- tibble(
+  id = 1:N,
+  tte = rpois(N, mu),
+  tto = pmin(rpois(N, 12), tte),
+  censored = tto < tte
+)
+
+df %>% 
+  head() %>% 
+  kable() %>% kable_styling()
+
+```
+
+```{r censoring_count, echo = FALSE}
+df %>% 
+  ggplot(aes(censored)) +
+  geom_bar(aes(y = ..count../sum(..count..))) +
+  scale_y_continuous(labels = percent) +
+  labs(
+    x = 'Is censored?',
+    y = 'Percentage of dataset',
+    title = 'Censoring in our randomly generated dataset'
+  )
+```
+
+Note that we observe `tto` but not `tte`. How might we estimate $\mu$? One way is to take the mean.
+
+```{r means}
+df %>% 
+  select(tte, tto) %>% 
+  summarise_all(mean) %>% 
+  kable() %>% kable_styling()
+
+```
+
+This estimate is fairly good for `tte` but is too low for `tto`. This was to be expected because we know that `tto` is smaller than `tte` for censored observations.
+
+It's not possible to just filter out the censored values as this also gives biased estimates. In fact, it makes our estimate worse in this case.
+
+```{r filtered_means}
+df %>% 
+  filter(!censored) %>% 
+  select(tte, tto) %>% 
+  summarise_all(mean) %>% 
+  kable() %>% kable_styling()
+
+```
+
+
+### A more sophisticated way to be wrong
+
+So how can we estimate μ using just `tto`? The first step is to reinterperet the mean as the estimator that maximises a [likelihood](https://khakieconomics.github.io/2018/07/14/What-is-a-likelihood-anyway.html) (the maximum likelihood estimator, or MLE). The likelihood is defined as the probability of the data given the estimate. Under the true model, this probability is $f(tte_i \mid \mu) = \text{Poisson}(tte_i \mid \mu)$ for the $i$th case, giving the likelihood of the whole dataset as:
+
+$$
+L(\mu) := \prod_{i = 1}^N f(tte_i | \mu)
+.
+$$
+
+The mean maximises this likelihood, which is why the mean of `tte` is close to the true value. 
+
+To further illustrate this point, note that this is the estimate we get when regressing `tte` on a constant.
+
+```{r poisson_regression}
+df %>% 
+  glm(
+    formula = tte ~ 1,
+    family = poisson(link = 'log'),
+    data = .
+  ) %>% 
+  tidy() %>% 
+  pull(estimate) %>% 
+  exp()
+```
+
+However, we don't observe `tte`; we observe `tto`. Simply replacing `tte` with `tto` and maximising 
+
+$$
+L(\mu) := \prod_{i = 1}^N f(tto_i \mid \mu)
+$$
+
+gives us the mean of `tto`, which is a bad estimate because this 'likelihood' does not take censoring into account. 
+
+### The correct likelihood
+
+So what likelihood can we use? Note that in uncensored cases, $f(tto_i \mid \mu) = f(tte_i \mid \mu)$, just like above.
+
+
+In the censored cases, all we know is that `tte` must be larger than what was observed. This means that we need to sum over the probabilities of all possibilities: $S(tto_i \mid \mu) := \sum_{t > tto_i} f(t \mid \mu)$. The full likelihood is then 
+
+$$
+L(\mu) 
+:= 
+\prod_{i = 1}^N \delta_i f(tto_i \mid \mu)
+\times
+\prod_{i = 1}^N (1 - \delta_i) S(tto_i \mid \mu)
+,
+$$
+
+where $\delta_i$ is 1 if the event was observed and 0 if censored. Although we'll stick to the Poisson model in this post, we can use these ideas to create a likelihood for many different choices of distribution by using the appropriate probability/survival functions $f$, $S$.
+
+## Implementation
+
+We will fit this model using Stan because it is relatively easy to write a Bayesian model once we have understood the data generating process. This will require us to define prior distributions (on $\mu$) just like with any Bayesian method. Since we are mostly interested in understanding the likelihood here, we will not give much consideration to the prior.  However, if applying this to a real problem, it would be a good idea to give this more thought in a [principled Bayesian workflow](https://betanalpha.github.io/assets/case_studies/principled_bayesian_workflow.html).
+
+### Terminology
+
+Stan makes the following abbreviations:
+
+`pmf`
+: probability mass function, $f(tto_i \mid \mu) = \text{Poisson}(tto_i \mid \mu)$
+
+`lpmf`
+: log(`pmf`)
+
+`ccdf`
+: survival function, a.k.a. complementary cumulative distribution function, $S(tto_i | \mu) := \sum_{t > tto_i} \text{Poisson}(t | \mu)$
+
+`lccdf`
+: log(`ccdf`)
+
+`target`
+: log(posterior probability density) = log(likelihood x prior).
+
+Stan uses the log-scale for its calculations, so we will need the log-likelihood:
+
+$$
+\log L(\mu) 
+:= 
+\sum_{i = 1}^N \delta_i \log f(tto_i \mid \mu)
++
+\sum_{i = 1}^N (1 - \delta_i) \log S(tto_i \mid \mu)
+.
+$$
+
+
+### The model
+
+In [our model](./censored_poisson.stan), we add the `lccdf` if the observation is censored and `lpmf` if not censored. Let's load our model and take a look.
+
+```{r compile, results = 'hide'}
+model <- stan_model('censored_poisson.stan')
+```
+
+```{r model}
+model
+```
+
+The language used in the Stan model is slightly different from R-notation but hopefully intuitive enough to convince yourself that it's the same model we described above.
+
+Now we can sample from the posterior of our model.
+
+```{r fit}
+fit <- model %>% 
+  sampling(
+    data = compose_data(df, shape = 2, rate = 0.05),
+    iter = 2000,
+    warmup = 500
+  ) 
+
+fit
+
+```
+
+Stan has an amazing array of diagnostics to check the quality of the fitted model. Since our model is fairly simple and all checks are in order, I won't describe them here.
+
+```{r ci, include=FALSE}
+ci <- fit %>% 
+  spread_draws(mu) %>% 
+  mean_qi() 
+
+ci
+
+```
+
+The point estimate for `mu` is `r round(ci$mu, 2)` and the true value is contained within the 95% credible interval [`r round(ci$.lower, 2)`, `r round(ci$.upper, 2)`]. We can also plot all the samples from our posterior.
+
+```{r estimate_histogram, echo = FALSE}
+fit %>% 
+  spread_draws(mu) %>% # draw from the posterior
+  ggplot(aes(mu)) +
+  geom_density(fill = 'skyblue', colour = 'white') +
+  geom_vline(xintercept = mu, linetype = 'dashed', colour = 'orangered') +
+  geom_pointintervalh(data = ci, aes(x = mu, y = 0), size = 10, colour = 'dimgrey') +
+  scale_x_continuous(breaks = seq(9, 11, 0.02)) +
+  labs(
+    x = 'Estimate',
+    y = 'Probability density',
+    title = 'Estimate of μ taking censoring into account',
+    subtitle = str_glue(paste(
+      'Orange dashed line: true value μ = {mu}',
+      'Grey horizontal line: 95% credibility interval [{round(ci$.lower, 2)}, {round(ci$.upper, 2)}]',
+      sep = '\n'
+    ))
+  ) +
+  NULL
+  
+```
+
+## Conclusion
+
+We have seen how to change the likelihood to take censored observations into account. Moreover, the same process works for most distributions, so you can swap out the Poisson for Weibull/gamma/lognormal or whatever you want. Using the Bayesian modelling language, Stan, makes it super easy to test your statistical intuitions by turning them into a workable model, so I'll definitely be exploring Stan more in the future.

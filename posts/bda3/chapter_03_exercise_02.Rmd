@@ -1,0 +1,158 @@
+---
+title: "BDA3 Chapter 3 Exercise 2"
+author: "Brian Callander"
+date: "2018-09-15"
+tags: bda chapter 3, solutions, bayes, multinomial, dirichlet, beta
+always_allow_html: yes
+output: 
+  md_document:
+    variant: markdown
+    preserve_yaml: yes
+---
+
+Here's my solution to exercise 2, chapter 3, of [Gelman's](https://andrewgelman.com/) *Bayesian Data Analysis* (BDA), 3rd edition. There are [solutions](http://www.stat.columbia.edu/~gelman/book/solutions.pdf) to some of the exercises on the [book's webpage](http://www.stat.columbia.edu/~gelman/book/).
+
+<!--more-->
+
+<div style="display:none">
+  $\DeclareMathOperator{\dbinomial}{Binomial}
+   \DeclareMathOperator{\dbern}{Bernoulli}
+   \DeclareMathOperator{\dpois}{Poisson}
+   \DeclareMathOperator{\dnorm}{Normal}
+   \DeclareMathOperator{\dcauchy}{Cauchy}
+   \DeclareMathOperator{\dexponential}{Exp}
+   \DeclareMathOperator{\dgamma}{Gamma}
+   \DeclareMathOperator{\dinvgamma}{InvGamma}
+   \DeclareMathOperator{\invlogit}{InvLogit}
+   \DeclareMathOperator{\logit}{Logit}
+   \DeclareMathOperator{\ddirichlet}{Dirichlet}
+   \DeclareMathOperator{\dbeta}{Beta}$
+</div>
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(
+  echo = TRUE,
+  comment = NA,
+  message = FALSE,
+  warning = FALSE,
+  error = TRUE,
+  dev = "svglite",
+  fig.ext = ".svg" 
+)
+
+library(tidyverse)
+library(scales)
+library(kableExtra)
+
+theme_set(theme_bw())
+
+```
+
+```{r data, echo = FALSE}
+df <- tibble(
+  survey = c('pre-debate', 'post-debate'),
+  bush = c(294, 288),
+  dukakis = c(307, 332),
+  other = c(38, 19),
+  total = 639
+)
+
+df %>% 
+  kable() %>% 
+  kable_styling(bootstrap_options = c("striped", "hover", "responsive"))
+```
+
+Let $\theta_\text{pre} \sim \ddirichlet_3(\alpha_\text{pre})$ and $\theta_\text{post} \sim \ddirichlet_3(\alpha_\text{post})$ be the pre- and post-debate priors. Then the posteriors are 
+
+$$
+\begin{align}
+  \theta_\text{pre} \mid y &\sim \ddirichlet\left(294 + \alpha_{(\text{pre}, \text{b})}, 307 + \alpha_{(\text{pre}, \text{d})}, 38 + \alpha_{(\text{pre}, \text{o})} \right)
+  \\
+  \theta_\text{post} \mid y &\sim \ddirichlet\left(288 + \alpha_{(\text{post}, \text{b})}, 332 + \alpha_{(\text{post}, \text{d})}, 19 + \alpha_{(\text{post}, \text{o})} \right)
+.
+\end{align}
+$$
+
+Denote the proportion of support for Bush amongst Bush/Dukakis supporters by $\phi_\bullet := \frac{\theta_{(\bullet, \text{b})}}{\theta_{(\bullet, \text{b})} + \theta_{(\bullet, \text{d})}}$. The results of the [previous exercise](./chapter_03_exercise_01.html) show that we can treat this as a beta-binomial problem by simply ignoring the results for `other`. More precisely,
+
+$$
+\begin{align}
+  \phi_\text{pre} \mid y &\sim \dbeta\left(294 + \alpha_{(\text{pre}, \text{b})}, 307 + \alpha_{(\text{pre}, \text{d})} \right)
+  \\
+  \phi_\text{post} \mid y &\sim \dbeta\left(288 + \alpha_{(\text{post}, \text{b})}, 332 + \alpha_{(\text{post}, \text{d})} \right)
+\end{align}
+.
+$$
+
+Let's plot these posteriors and their difference $\delta := (\phi_\text{post} \mid y) - (\phi_\text{pre} \mid y)$.
+
+```{r posteriors}
+alpha_bush <- 1
+alpha_dukakis <- 1
+
+posteriors <- expand.grid(
+    value = seq(0, 1, 0.001),
+    survey = df$survey
+  ) %>% 
+  as_tibble() %>% 
+  inner_join(df, by = 'survey') %>% 
+  mutate(
+    post_bush = bush + alpha_bush,
+    post_dukakis = dukakis + alpha_dukakis,
+    density = dbeta(value, post_bush, post_dukakis)
+  ) 
+```
+
+```{r posteriors_plot, echo = FALSE}
+posteriors %>% 
+  ggplot() +
+  aes(value, density, colour = survey) +
+  geom_line() +
+  scale_x_continuous(limits = c(0.3, 0.7), labels = percent) +
+  labs(
+    x = 'Proportion in support of Bush',
+    y = 'Density',
+    title = 'Posterior estimate of proportion in support of Bush',
+    subtitle = 'Pre- vs. post-debate',
+    colour = 'Survey'
+  )
+  
+```
+
+
+```{r shift}
+N <- 10000
+
+shift <- expand.grid(
+    draw = 1:N, 
+    survey = df$survey
+  ) %>% 
+  as_tibble() %>% 
+  inner_join(df, by = 'survey') %>% 
+  mutate(
+    post_bush = bush + alpha_bush,
+    post_dukakis = dukakis + alpha_dukakis,
+    value = rbeta(n(), post_bush, post_dukakis)
+  ) %>% 
+  select(draw, survey, value) %>% 
+  spread(survey, value) %>% 
+  mutate(difference = `post-debate` - `pre-debate`) 
+```
+
+```{r shift_plot, echo = FALSE}
+shift %>% 
+  ggplot() +
+  aes(difference) +
+  geom_histogram(bins = 50) +
+  geom_vline(xintercept = 0, linetype = 'dashed', colour = 'dark orange') +
+  scale_x_continuous(labels = percent) +
+  labs(
+    x = 'Percentage point shift',
+    y = 'Count',
+    title = 'Shift in support for Bush vs Dukakis',
+    subtitle = str_glue("{comma(N)} draws from the posterior of the pre- vs. post-debate difference")
+  )
+  
+```
+
+There is a `r percent(mean(shift$difference > 0))` probability (the area above 0) that there was a positive shift towards Bush.

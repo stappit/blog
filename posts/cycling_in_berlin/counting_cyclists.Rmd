@@ -1,0 +1,456 @@
+---
+title: "Counting cylists in Berlin"
+author: "Brian Callander"
+date: "2018-11-29"
+tags: berlin, cycling, open data, eda, timeseries, excel
+always_allow_html: yes
+output: 
+  md_document:
+    variant: markdown
+    preserve_yaml: yes
+---
+
+I recently found out that berlin has a bunch of automatic bike-counters around berlin...and the [data is public](https://daten.berlin.de/datensaetze/radz%C3%A4hldaten-berlin)! There's even an [interactive map](https://www.berlin.de/senuvk/verkehr/lenkung/vlb/de/karte.shtml) of the stations. This is all pretty awesome. Although the data is stored in multiple sheets of an excel file (#?&!!), I thought it'd be an interesting exercise to clean it up and see how useful it could be for other projects.
+
+<!--more-->
+
+![An induction-loop bike-counter](radzaehler_620.jpg)
+
+<div style="display:none">
+  $\DeclareMathOperator{\dbinomial}{Binomial}
+   \DeclareMathOperator{\dbern}{Bernoulli}
+   \DeclareMathOperator{\dpois}{Poisson}
+   \DeclareMathOperator{\dnorm}{Normal}
+   \DeclareMathOperator{\dt}{t}
+   \DeclareMathOperator{\dcauchy}{Cauchy}
+   \DeclareMathOperator{\dexponential}{Exp}
+   \DeclareMathOperator{\duniform}{Uniform}
+   \DeclareMathOperator{\dgamma}{Gamma}
+   \DeclareMathOperator{\dinvgamma}{InvGamma}
+   \DeclareMathOperator{\invlogit}{InvLogit}
+   \DeclareMathOperator{\logit}{Logit}
+   \DeclareMathOperator{\ddirichlet}{Dirichlet}
+   \DeclareMathOperator{\dbeta}{Beta}$
+</div>
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(
+  echo = TRUE,
+  comment = NA,
+  message = FALSE,
+  warning = FALSE,
+  error = TRUE,
+  # cache = TRUE,
+  dev = "svglite",
+  fig.ext = ".svg" 
+)
+
+library(tidyverse)
+library(lubridate)
+library(ggridges)
+library(scales)
+library(kableExtra)
+
+library(digest)
+
+theme_set(theme_bw())
+
+Sys.setlocale(category = 'LC_TIME', locale = 'en_GB.UTF-8')
+```
+
+
+## Get the data
+
+Let's grab the data.
+
+```{r download}
+filename <- 'cyclist_counts.xlsx'
+url <- "https://www.berlin.de/senuvk/verkehr/lenkung/vlb/download/radzaehlung/Gesamtdatei_Stundenwerte_2014_2017.xlsx"
+
+if (!file.exists(filename))
+  download.file(url, filename, 'libcurl')
+```
+
+It's probably a good idea to [take a look at the excel file](`r url`) so that it's easier to follow along with the code below. You can also [open up the R markdown](./counting_cyclists.Rmd) in RStudio.
+
+Unfortunately, there's no official checksum provided to guarantee the data were downloaded correctly, but I can show you what my checksum is.
+
+```{r}
+digest::digest(filename, algo = 'md5', file = TRUE)
+```
+
+If you get a different md5 checksum, then you don't have the same file as I do.
+
+
+## The counters
+
+The first sheet `Hinweise` (= advice) is mostly text describing some general information about the data. The notable parts tell us that it is the uneditted data from the counter systems and is published at the end of the counting-year. What's a `counting-year`? Good question; no idea. The excel file was last modified on the 20th of April 2018, so I guess the next update will probably be around April 2019.
+
+There are also some disclaimers basically telling us that the counters don't necessarily give an exact count due to weather conditions, maintainance, and other complications. This is described in more detail on the [FAQ page](https://www.berlin.de/senuvk/verkehr/lenkung/vlb/de/radzaehlungen_faq.shtml) (in German). They work using an [induction loop](https://en.wikipedia.org/wiki/Induction_loop), which detects a metal object moving passed. Full carbon bikes are not countable but there are likely so few that the difference is absorbed in the measurement error anyway. Apparently bikes with more or less than two wheels can also cause miscounts. However, groups of bikes can be counted accurately so long as they don't ride too closely side-by-side.
+
+The [FAQ page](https://www.berlin.de/senuvk/verkehr/lenkung/vlb/de/radzaehlungen_faq.shtml) also tells us that some counters are set up in pairs in order to count the two directions of traffic separately. Well see how to detect these pairs when we inspect the data.
+
+The first data sheet, `Standortdaten` = location data, lists the counters with a unique ID, a street name, lattitude-longitude (not shown here), and installation date. 
+
+```{r data0}
+counters <- filename %>% 
+  readxl::read_excel(sheet = 'Standortdaten') %>% 
+  transmute(
+    id = `Zähler` %>% as_factor(),
+    pair = str_replace(id, '-[NSOW]$', '') %>% as_factor(),
+    location = `Beschreibung - Fahrtrichtung`,
+    installation_date = as.Date(Installationsdatum)
+  ) %>% 
+  arrange(installation_date, location) %>% 
+  write_csv('counters.csv')
+
+n_counters <- counters %>% distinct(id) %>% nrow()
+```
+
+There are `r n_counters` counters listed in the sheet. I have seen it written that there are only 17, but I this number doesn't count the paired counters as separate. The pairs are listed as north/south or east/west (in German), with the last letter of the ID indicating the direction. This allows us to identify the pair by removing the last character of the ID. 
+
+```{r counters_table, echo=FALSE}
+counters %>% 
+  kable(caption = 'The counter locations') %>% 
+  kable_styling(bootstrap_options = c('hover', 'striped', 'responsive'))
+```
+
+I'm not sure what the numbers in the ID are, but the first group of letters is an abbreviation of the district (Mitte, Pankow, etc), the second group is an abbreviation of the street name, and the third group (where it exists) is the direction of traffic (north, south, east, west).
+
+## Take a deep breath
+
+Now for the data we came here for. As of this writing, there are 6 sheets, one for each year from 2012 to 2017.
+
+```{r data_years}
+years <- 2012:2017
+```
+
+The corresponding sheets are called `Jahresdatei YYYY` (= year data).
+
+```{r data_sheets}
+sheets0 <- years %>% 
+  as.character() %>% 
+  paste0('Jahresdatei ', .) 
+
+sheets0
+```
+
+Let's turn that into a named list so that it works well with the `map_dfr` function below.
+  
+```{r data_sheets_named}
+sheets <- sheets0 %>% 
+  as.list() %>% 
+  set_names(., .) 
+```
+
+The `read_excel` function isn't as flexible as its `read_csv` cousin so we'll write a wrapper for loading the data from a particular sheet.
+  
+```{r data_function}
+read_excel <- function(sheet, .filename=filename, .n=n_counters) {
+  readxl::read_excel(
+    .filename, 
+    sheet = sheet, 
+    col_types = c('date', rep('numeric', .n))
+  ) 
+}
+```
+
+Now we can simply map that function over all of our sheet names to get a dataframe from each sheet, then bind the rows of these dataframes together so that we have all the data together. The columns also have awkward headers, so we'll rename them to the counter ID.
+
+```{r data_untidy}
+df_untidy <- sheets %>% 
+  map_dfr(read_excel, .id = 'sheet') %>% 
+  
+  # get rid of redundant info in the col names
+  # and use english names
+  set_names(names(.) %>% str_replace_all(" .*", "")) %>% 
+  rename(measured_at = Zählstelle)
+```
+
+```{r, echo=FALSE}
+df_untidy %>% 
+  tail(5) %>% 
+  select(sheet, measured_at, contains('MI')) %>% 
+  kable(caption = 'Example of untidy output. Only the counters in Mitte are shown.') %>% 
+  kable_styling(bootstrap_options = c('hover', 'striped', 'responsive'))
+```
+
+All that remains is to [tidy up the data](http://vita.had.co.nz/papers/tidy-data.html):
+
+1. Each variable forms a column: we have the ID of the counter, the hour of measurement, and the actual measurement.
+2. Each observation forms a row: every hourly measurement should have exactly one row.
+3. Each type of observational unit forms a table: there's only the hourly count.
+
+The untidy data has a possible measurement for every counter, so we'll need to gather those columns together. The nulls exists only because of the untidy format used - we can simply drop them.
+
+```{r data_tidy}
+df_tidy <- df_untidy %>% 
+  gather(counter_id, total, -measured_at, -sheet) %>% 
+  filter(!is.na(total)) %>% 
+  mutate(counter_id = counter_id %>% factor(levels = levels(counters$id))) 
+```
+
+```{r data_tidy_table, echo=FALSE}
+df_tidy %>% 
+  tail() %>% 
+  kable(caption = 'Example of tidy output.') %>% 
+  kable_styling(bootstrap_options = c('hover', 'striped', 'responsive'))
+```
+
+After performing some checks, I realised there are a lot of duplicated data. In particular, `Jahresdatei 2012` also contains a complete copy of `Jahresdatei 2013`. Let's get rid of the duplicates. Whilst we're at it, we'll add in some extra info about each counter by joining on the counter dataframe.
+  
+```{r data}
+df <- df_tidy %>% 
+  distinct(counter_id, measured_at, .keep_all = TRUE) %>% 
+  # add a unique row id
+  ungroup() %>% 
+  arrange(counter_id, measured_at) %>% 
+  mutate(id = 1:n()) %>% 
+  
+  # other helpful stuff
+  # reorder columns
+  select(id, sheet, counter_id, measured_at, total) %>% 
+  # save the data
+  write_csv('counter_data.csv') %>% 
+  # add counter info
+  inner_join(counters, by = c('counter_id' = 'id')) %>% 
+  arrange(id)
+```
+
+This leaves us with a total of `r df %>% nrow() %>% comma()` measurements.
+
+I'll use the `stopifnot` function to list a bunch of properties that I know the data must satisfy if it is correct. This prevents this notebook from compiling if any of them have an entry that doesn't evaluate to `TRUE`.
+
+```{r checks}
+stopifnot(
+  # all counts non-negative
+  df$total >= 0, 
+  
+  # measurments occur after installation
+  df$measured_at >= df$installation_date, 
+  
+  # measurements occur within the time range
+  year(df$measured_at) <= max(years),
+  year(df$measured_at) >= min(years),
+  
+  # installations occur within the time range
+  year(df$installation_date) <= max(years),
+  year(df$installation_date) >= min(years),
+  
+  # there are as many row ids as rows
+  max(df$id) == nrow(df),
+  
+  # at most as many measurements as hours in the year 
+  df %>% 
+    group_by(counter_id, year = year(measured_at)) %>% 
+    count() %>% 
+    transmute(8760 + if_else(year %% 4 == 0, 24, 0) - n >= 0) %>% 
+    pull(),
+  
+  # exactly 26 counters
+  n_counters == df %>% 
+    distinct(counter_id) %>% 
+    nrow()
+)
+
+```
+
+## Exploring the data
+
+In principle there should be one measurement per counter per hour, starting from when each counter is installed. Let's check how many gaps appear in the data. 
+
+```{r maintenance}
+gaps <- df %>% 
+  group_by(counter_id) %>% 
+  mutate(
+    next_measurement = lead(measured_at),
+    difference = next_measurement - measured_at
+  ) %>% 
+  filter(difference > 1) %>% 
+  select(id, counter_id, difference, measured_at, next_measurement)
+```
+
+```{r maintenance_table, echo=FALSE}
+gaps %>% 
+  kable(caption = 'Gaps in measurment records.') %>% 
+  kable_styling(bootstrap_options = c('hover', 'striped', 'responsive'))
+```
+
+There are only `r nrow(gaps)` gaps, and all but two are resolved fairly quickly. I'm not sure what caused the two larger gaps.
+
+Some counters are in higher traffic locations than others. Note that the larger the median is, the larger the interquartile range is too. This happens in almost all of the plots.
+
+```{r by_counter}
+by_counter <- df %>% 
+  group_by(counter_id) %>% 
+  summarise(
+    q25 = quantile(total, 0.25),
+    q50 = quantile(total, 0.50),
+    q75 = quantile(total, 0.75)
+  ) 
+```
+
+```{r by_counter_plot, echo=FALSE} 
+by_counter %>% 
+  ggplot() +
+  aes(reorder(counter_id, q50), ymin = q25, y = q50, ymax = q75) +
+  geom_pointrange() +
+  coord_flip() +
+  labs(
+    x = 'Countid ID',
+    y = 'Cyclists per hour',
+    title = 'Counts by counter',
+    subtitle = '25th, 50th (median), and 75th percentiles'
+  ) +
+  NULL
+
+```
+
+There is also a commuter-effect, with peaks showing at 08:00 and 17:00. There is almost no traffic in the wee hours of the morning.
+
+```{r by_hour}
+by_hour <- df %>% 
+  group_by(h = hour(measured_at)) %>% 
+  summarise(
+    q25 = quantile(total, 0.25),
+    q50 = quantile(total, 0.50),
+    q75 = quantile(total, 0.75)
+  ) 
+```
+
+```{r by_hour_plot, echo = FALSE}
+by_hour %>% 
+  ggplot() +
+  aes(h, ymin = q25, y = q50, ymax = q75) +
+  geom_pointrange() +
+  scale_x_continuous(breaks = seq(0, 24, 4)) +
+  labs(
+    x = 'Hour of the day',
+    y = 'Cyclists per hour',
+    title = 'Counts by hour of the day',
+    subtitle = '25th, 50th (median), and 75th percentiles'
+  ) 
+
+```
+
+Since there is a strong commuter-effect and some counters are paired to count different directions, it makes sense to take a look at the difference in traffic between the pairs during the day. We see that, for example, in Jannowitzbrücke (`02-MI-JAN`) cyclists travel south-bound in the morning and north-bound in the evening. Interestingly, traffic seems to flow in mostly north-bound at Berlinerstraße (`10-PA-BER`) at almost any time of the day.  I'm not sure why this might be the case but it's worth looking into later. The one exception is at 08:00, when many cyclists are likely commuting to the centre of Berlin (south-bound).
+
+
+```{r pairs_by_hour}
+pairs_by_hour <- df %>% 
+  filter(str_detect(location, 'Nord|Ost|Süd|West')) %>% 
+  inner_join(df, by = c('pair', 'measured_at')) %>% 
+  filter(as.numeric(counter_id.x) < as.numeric(counter_id.y)) %>% 
+  select(measured_at, matches('id|total')) %>% 
+  mutate(
+    comparison = paste0(counter_id.x, ' - ', counter_id.y),
+    difference = total.x - total.y
+  ) %>% 
+  group_by(g = hour(measured_at), comparison) %>% 
+  summarise(difference = mean(difference)) 
+```
+
+```{r pairs_by_hour_plot, echo=FALSE}
+pairs_by_hour %>% 
+  ggplot() +
+  aes(g, difference, group = comparison) +
+  geom_col() +
+  facet_wrap(~comparison) +
+  scale_x_continuous(breaks = seq(0, 24, 4)) +
+  labs(
+    x = 'Hour of the day',
+    y = 'Difference in average number of cyclists',
+    title = 'Difference in counts between pairs',
+    subtitle = 'by hour of the day'
+  ) +
+  NULL
+  
+```
+
+In Klosterstraße (`15-SP-KLO`) and Mariendorfer Damm (`20-TS-MAR`) it looks like traffic is roughly equal in both directions all day. The former flows slightly more north-bound in evening, the latter more north-bound in the morning. Given the positions of these two pairs of counters, it is unlikely that they are part of a commuter-loop.  The overall counts for these four counters is fairly small on average, so these apparent effects may just be noise.
+
+The weekday counts seem fairly constant and fall by about a factor of a third on the weekend. This is consistent with the commuter-effect seen above.
+
+```{r by_weekday}
+by_weekday <- df %>% 
+  group_by(g = wday(measured_at, label = TRUE, week_start = 1)) %>% 
+  summarise(
+    q25 = quantile(total, 0.25),
+    q50 = quantile(total, 0.50),
+    q75 = quantile(total, 0.75)
+  ) 
+```
+
+```{r by_weekday_plot, echo = FALSE}
+by_weekday %>% 
+  ggplot() +
+  aes(g, ymin = q25, y = q50, ymax = q75) +
+  geom_pointrange() +
+  labs(
+    x = 'Day of the week',
+    y = 'Cyclists per hour',
+    title = 'Counts by day of the week',
+    subtitle = '25th, 50th (median), and 75th percentiles'
+  ) 
+
+```
+
+There is also a yearly seasonal pattern. Apart from berliners being more willing to commute in summer, I'd be willing to bet that tourists are also responsible for the summer peak in June/July. In winter, the roads can become unsafe for cyclists due to the ice, snow, and lack of maintenance.
+
+```{r by_month}
+by_month <- df %>% 
+  group_by(g = month(measured_at, label = TRUE)) %>% 
+  summarise(
+    q25 = quantile(total, 0.25),
+    q50 = quantile(total, 0.50),
+    q75 = quantile(total, 0.75)
+  ) 
+```
+
+```{r by_month_plot, echo=FALSE}
+by_month %>% 
+  ggplot() +
+  aes(g, ymin = q25, y = q50, ymax = q75) +
+  geom_pointrange() +
+  labs(
+    x = 'Month of year',
+    y = 'Cyclists per hour',
+    title = 'Counts by month of the year',
+    subtitle = '25th, 50th (median), and 75th percentiles'
+  ) 
+
+```
+
+There is no clear yearly effect, as the median just ambles around 60 cyclist per hour.
+
+```{r by_year}
+by_year <- df %>% 
+  group_by(g = year(measured_at)) %>% 
+  summarise(
+    q25 = quantile(total, 0.25),
+    q50 = quantile(total, 0.50),
+    q75 = quantile(total, 0.75)
+  ) 
+```
+
+```{r by_year_plot, echo = FALSE}
+by_year %>% 
+  ggplot() +
+  aes(g, ymin = q25, y = q50, ymax = q75) +
+  geom_pointrange() +
+  labs(
+    x = 'Month of year',
+    y = 'Cyclists per hour',
+    title = 'Counts by year',
+    subtitle = '25th, 50th (median), and 75th percentiles'
+  ) 
+```
+
+## What's next?
+
+So...that was all easier than expected. The weird north-bound pattern at Berlinerstraße and the two large measurement gaps still need to be looked into, but overall the data are in a good state. I'd like to be able to combine this with data on bike-related traffic accidents, but from what I can see, the Berlin police chose one of the few formats worse than an excel sheet: [pdf tables](https://www.berlin.de/polizei/aufgaben/verkehrssicherheit/verkehrsunfallstatistik/). 
+
+With 3D pie charts.
+
+...
+

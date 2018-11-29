@@ -1,0 +1,112 @@
+---
+title: "BDA3 Chapter 2 Exercise 4"
+author: "Brian Callander"
+date: "2018-08-23"
+tags: binomial, bayes, solutions, bda chapter 2, bda, normal approximation, multi-modal
+always_allow_html: yes
+output: 
+  md_document:
+    variant: markdown
+    preserve_yaml: yes
+---
+
+Here's my solution to exercise 4, chapter 2, of [Gelman's](https://andrewgelman.com/) *Bayesian Data Analysis* (BDA), 3rd edition. There are [solutions](http://www.stat.columbia.edu/~gelman/book/solutions.pdf) to some of the exercises on the [book's webpage](http://www.stat.columbia.edu/~gelman/book/).
+
+<!--more-->
+
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(
+  echo = TRUE,
+  comment = NA,
+  message = FALSE,
+  warning = TRUE,
+  error = TRUE,
+  cache = TRUE
+)
+
+library(tidyverse)
+library(rstan)
+library(tidybayes)
+library(kableExtra)
+
+theme_set(theme_bw())
+
+options(mc.cores = parallel::detectCores())
+rstan_options(auto_write = TRUE)
+
+```
+
+<div style="display:none">
+  $\DeclareMathOperator{\dbinomial}{binomial}
+   \DeclareMathOperator{\dbern}{Bernoulli}
+   \DeclareMathOperator{\dbeta}{beta}$
+</div>
+
+
+Consider 1000 rolls of an unfair die, where the probability of a 6 is either 1/4, 1/6, or 1/12. Let's draw the distribution and the normal approximation.
+
+```{r ex4_data}
+N <- 1000
+p6 <- c(1 / 4, 1 / 6, 1 / 12)
+
+ex4 <- expand.grid(
+    y = seq(0, N),
+    theta = p6
+  ) %>% 
+  mutate(
+    mu = N * theta,
+    sigma = sqrt(N * theta * (10 - theta)),
+    binomial = dbinom(y, N, theta),
+    normal_approx = dnorm(y, mu, sigma),
+    theta = scales::percent(signif(theta))
+  ) %>% 
+  select(-mu, -sigma) %>% 
+  gather(distribution, probability, binomial, normal_approx) %>% 
+  spread(theta, probability) %>% 
+  mutate(prior_probability = 0.25 * `8.3%` + 0.5 * `16.7%` + 0.25 * `25.0%`)
+```
+
+```{r ex4_table, echo = FALSE}
+ex4 %>% 
+  head() %>% 
+  kable() %>% kable_styling()
+```
+  
+```{r ex4_plot, echo = FALSE}
+ex4 %>% 
+  ggplot() +
+  aes(x = y, y = prior_probability, colour = distribution) +
+  geom_line()
+
+```
+
+The normal approximation underestimates the maxima and overestimates the values between the maxima. From the percentiles in the table below, we see that the normal approximation is best near the median but becomes gradually worse towards towards both extremes.
+
+```{r ex4_percentiles}
+percentiles <- c(0.05, 0.25, 0.5, 0.75, 0.95)
+
+ex4 %>% 
+  group_by(distribution) %>% 
+  arrange(y) %>% 
+  mutate(
+    cdf = cumsum(prior_probability),
+    percentile = case_when(
+      cdf <= 0.05 ~ '05%',
+      cdf <= 0.25 ~ '25%',
+      cdf <= 0.50 ~ '50%',
+      cdf <= 0.75 ~ '75%',
+      cdf <= 0.95 ~ '95%'
+    )
+  ) %>% 
+  filter(cdf <= 0.95) %>% 
+  group_by(distribution, percentile) %>% 
+  slice(which.max(cdf)) %>% 
+  select(distribution, percentile, y) %>% 
+  spread(distribution, y) %>% 
+  arrange(percentile) %>% 
+  kable() %>% kable_styling()
+    
+```
+
+

@@ -1,0 +1,175 @@
+---
+title: "BDA3 Chapter 3 Exercise 11"
+author: "Brian Callander"
+date: "2018-10-21"
+tags: bda chapter 3, solutions, bayes
+always_allow_html: yes
+output: 
+  md_document:
+    variant: markdown
+    preserve_yaml: yes
+---
+
+Here's my solution to exercise 11, chapter 3, of [Gelman's](https://andrewgelman.com/) *Bayesian Data Analysis* (BDA), 3rd edition. There are [solutions](http://www.stat.columbia.edu/~gelman/book/solutions.pdf) to some of the exercises on the [book's webpage](http://www.stat.columbia.edu/~gelman/book/).
+
+<!--more-->
+
+<div style="display:none">
+  $\DeclareMathOperator{\dbinomial}{Binomial}
+   \DeclareMathOperator{\dbern}{Bernoulli}
+   \DeclareMathOperator{\dpois}{Poisson}
+   \DeclareMathOperator{\dnorm}{Normal}
+   \DeclareMathOperator{\dt}{t}
+   \DeclareMathOperator{\dcauchy}{Cauchy}
+   \DeclareMathOperator{\dexponential}{Exp}
+   \DeclareMathOperator{\duniform}{Uniform}
+   \DeclareMathOperator{\dgamma}{Gamma}
+   \DeclareMathOperator{\dinvgamma}{InvGamma}
+   \DeclareMathOperator{\invlogit}{InvLogit}
+   \DeclareMathOperator{\logit}{Logit}
+   \DeclareMathOperator{\ddirichlet}{Dirichlet}
+   \DeclareMathOperator{\dbeta}{Beta}$
+</div>
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(
+  echo = TRUE,
+  comment = NA,
+  message = FALSE,
+  warning = FALSE,
+  error = TRUE,
+  # cache = TRUE,
+  dev = "svglite",
+  fig.ext = ".svg" 
+)
+
+library(tidyverse)
+library(scales)
+library(kableExtra)
+
+library(rstan)
+library(rstanarm)
+library(tidybayes)
+
+rstan_options(auto_write = TRUE)
+options(mc.cores = parallel::detectCores())
+
+theme_set(theme_bw())
+
+```
+
+```{r data_generation, include = FALSE}
+tibble(
+    dose_log_g_ml = c(-0.86, -0.3, -0.05, 0.73),
+    animals = c(5, 5, 5, 5),
+    deaths = c(0, 1, 3, 5)
+  ) %>% 
+  write_csv('data/chapter_03_exercise_11.csv')
+
+```
+
+We will analyse [the data](data/chapter_03_exercise_11.csv) given in section 3.7 using different priors.
+
+```{r data}
+df <- read_csv('data/chapter_03_exercise_11.csv') 
+```
+
+```{r data_table, echo = FALSE}
+df %>% 
+  kable() %>% 
+  kable_styling(bootstrap_options = c("striped", "hover", "responsive"))
+```
+
+Here is the model specification.
+
+$$
+\begin{align}
+  y_i \mid \theta_i 
+  &\sim 
+  \dbinomial(n_i, \theta_i)
+  \\
+  \logit(\theta_i)
+  &=
+  \alpha + \beta x_i
+  \\
+  \alpha
+  &\sim
+  \dnorm(0, 2^2)
+  \\
+  \beta
+  &\sim
+  \dnorm(10, 10^2)
+\end{align}
+$$
+
+We won't use a grid approximation to the posterior but instead just use [Stan](https://www.rdocumentation.org/packages/rstanarm/versions/2.17.4/topics/stan_glm) because it is a lot simpler.
+
+```{r model}
+m <- rstanarm::stan_glm(
+  cbind(deaths, animals - deaths)  ~ 1 + dose_log_g_ml,
+  family = binomial(link = logit),
+  data = df,
+  prior_intercept = normal(0, 2),
+  prior = normal(10, 10),
+  warmup = 500,
+  iter = 4000
+)
+
+summary(m)
+```
+
+The [tidybayes package](https://mjskay.github.io/tidybayes/articles/tidybayes.html) offers convenient functions for drawing from the posterior. We'll also add in our `LD50` estimate.
+
+```{r draws}
+draws <- m %>% 
+  tidybayes::spread_draws(`(Intercept)`, dose_log_g_ml) %>% 
+  rename(
+    alpha = `(Intercept)`,
+    beta = dose_log_g_ml
+  ) %>% 
+  mutate(LD50 = -alpha / beta)
+```
+
+```{r joint_posterior_plot, echo = FALSE}
+n_draws <- max(draws$.draw)
+
+draws %>% 
+  ggplot() +
+  aes(alpha, beta) +
+  stat_density_2d(aes(fill = ..level..), geom = 'polygon') +
+  scale_y_continuous(limits = c(0, NA)) +
+  labs(
+    title = 'Join posterior distribution of α and β',
+    subtitle = str_glue('{comma(n_draws)} draws'),
+    x = 'α',
+    y = 'β'
+  )
+```
+
+The estimates look much the same with the more informative priors as with the uninformative priors. The posterior probability that $\beta > 0$ is:
+
+```{r}
+draws %>% 
+  mutate(positive = beta > 0) %>% 
+  summarise(mean(positive)) %>% 
+  pull() %>% 
+  percent()
+
+```
+
+The posterior LD50 estimate (conditional on $\beta > 0$) is as follows:
+
+```{r}
+draws %>% 
+  filter(beta > 0) %>% 
+  ggplot() + 
+  aes(LD50) +
+  geom_histogram(bins = 50) +
+  geom_vline(xintercept = 0, linetype = 'dashed', colour = 'chocolate') +
+  labs(
+    y = 'Count',
+    title = 'Histogram of posterior LD50 estimate',
+    subtitle = 'Conditional on β > 0'
+  )
+```
+

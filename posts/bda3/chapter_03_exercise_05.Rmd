@@ -1,0 +1,283 @@
+---
+title: "BDA3 Chapter 3 Exercise 5"
+author: "Brian Callander"
+date: "2018-10-06"
+tags: bda chapter 3, solutions, bayes, rounding error, marginal posterior, measurement error, noninformative prior, normal
+always_allow_html: yes
+output: 
+  md_document:
+    variant: markdown
+    preserve_yaml: yes
+---
+
+Here's my solution to exercise 5, chapter 3, of [Gelman's](https://andrewgelman.com/) *Bayesian Data Analysis* (BDA), 3rd edition. There are [solutions](http://www.stat.columbia.edu/~gelman/book/solutions.pdf) to some of the exercises on the [book's webpage](http://www.stat.columbia.edu/~gelman/book/).
+
+<!--more-->
+
+<div style="display:none">
+  $\DeclareMathOperator{\dbinomial}{Binomial}
+   \DeclareMathOperator{\dbern}{Bernoulli}
+   \DeclareMathOperator{\dpois}{Poisson}
+   \DeclareMathOperator{\dnorm}{Normal}
+   \DeclareMathOperator{\dt}{t}
+   \DeclareMathOperator{\dcauchy}{Cauchy}
+   \DeclareMathOperator{\dexponential}{Exp}
+   \DeclareMathOperator{\duniform}{Uniform}
+   \DeclareMathOperator{\dgamma}{Gamma}
+   \DeclareMathOperator{\dinvgamma}{InvGamma}
+   \DeclareMathOperator{\invlogit}{InvLogit}
+   \DeclareMathOperator{\logit}{Logit}
+   \DeclareMathOperator{\ddirichlet}{Dirichlet}
+   \DeclareMathOperator{\dbeta}{Beta}$
+</div>
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(
+  echo = TRUE,
+  comment = NA,
+  message = FALSE,
+  warning = FALSE,
+  error = TRUE,
+  # cache = TRUE,
+  dev = "svglite",
+  fig.ext = ".svg" 
+)
+
+library(tidyverse)
+library(scales)
+library(kableExtra)
+
+library(rstan)
+library(tidybayes)
+
+rstan_options(auto_write = TRUE)
+options(mc.cores = parallel::detectCores())
+
+theme_set(theme_bw())
+
+```
+
+Suppose we weigh an object 5 times with measurements 
+
+```{r measurements}
+measurements <- c(10, 10, 12, 11, 9)
+```
+
+```{r, include = FALSE}
+mu <- mean(measurements)
+sigma <- sd(measurements) / sqrt(length(measurements))
+n <- length(measurements)
+```
+
+
+all rounded to the nearest kilogram. Assuming the unrounded measurements are normally distributed, we wish to estimate the weight of the object. We will use the uniform non-informative prior $p(\mu, \log \sigma) \propto 1$.
+
+First, let's assume the measurments are not rounded. Then the marginal posterior mean is $\mu \mid y \sim t_{n - 1}(\bar y, s / \sqrt{n}) = t_4(10.4, 0.51)$.
+
+```{r mpm_plot, echo = FALSE}
+dst <- function(x, mu, sigma, nu)
+  dt((x - mu) / sigma, nu)
+
+tibble(weight = seq(4, 16, 0.01)) %>% 
+  mutate(density = dst(weight, mu, sigma, n - 1)) %>% 
+  ggplot() +
+  aes(weight, density) +
+  geom_area(fill = 'skyblue', colour = 'white') +
+  geom_vline(xintercept = 10.4, colour = 'chocolate', linetype = 'dashed') +
+  scale_x_continuous(limits = c(7, 14), breaks = seq(7, 14, 0.5)) +
+  labs(
+    x = 'Weight',
+    y = 'Density',
+    title = 'Marginal posterior mean assuming exact measurments',
+    subtitle = paste(
+      'mean 10.4 (dashed line)',
+      'standard deviation 1.41',
+      sep = '\n'
+    )
+  )
+```
+
+Now, let's find the posterior assuming rounded measurements. The probability of getting the rounded measurements $y$ is
+
+$$
+p(y \mid \mu, \sigma) = \prod_{i = 1}^n \Phi_{\mu, \sigma} (y_i + 0.5) - \Phi_{\mu, \sigma} (y_i - 0.5)
+$$
+
+where $\Phi_{\mu, \sigma}$ is the CDF of the $\dnorm(\mu, \sigma)$ distribution. This implies that the posterior is 
+
+$$
+p(\mu, \sigma \mid y) \propto \frac{1}{\sigma^2} \prod_{i = 1}^n \Phi_{\mu, \sigma} (y_i + 0.5) - \Phi_{\mu, \sigma} (y_i - 0.5) .
+$$
+
+Calculating this marginal posterior mean is pretty difficult, so we'll use [Stan](http://mc-stan.org/) to draw samples. My [first attempt](src/ex_03_05.stan) at writing the model was a direct translation of the maths above. However, it doesn't allow us to infer the unrounded values, as required in part d. The model can be expressed differently by considering the unrounded values as uniformly distributed around the rounded values, i.e. $z_i \sim \duniform (y_i - 0.5, y_i + 0.5)$. 
+
+
+```{r model_load, results='hide'}
+model <- rstan::stan_model('src/ex_03_05_d.stan')
+```
+
+```{r model}
+model
+```
+
+Note that Stan assumes parameters are uniform on their range unless specified otherwise.
+
+Let's also load a model that assumes the measurements are unrounded.
+
+```{r load_model_unrounded, results = 'hide'}
+model_unrounded <- rstan::stan_model('src/ex_03_05_unrounded.stan')
+```
+
+```{r model_unrounded}
+model_unrounded
+```
+
+Now we can fit the models to the data.
+
+```{r fit, results = 'hide'}
+data  = list(
+  n = length(measurements),
+  y = measurements
+)
+ 
+fit <- model %>% 
+  rstan::sampling(
+    data = data,
+    warmup = 1000,
+    iter = 5000
+  ) 
+
+fit_unrounded <- model_unrounded %>% 
+  rstan::sampling(
+    data = data,
+    warmup = 1000,
+    iter = 5000
+  ) 
+```
+
+We'll also need some draws from the posteriors to make our comparisons.
+
+```{r draws}
+draws <- fit %>% 
+  tidybayes::spread_draws(mu, sigma, z[index]) %>% 
+  # spread out z's so that
+  # there is one row per draw
+  ungroup() %>%  
+  mutate(
+    index = paste0('z', as.character(index)),
+    model = 'rounded'
+  ) %>% 
+  spread(index, z)
+
+draws_unrounded <- fit_unrounded %>% 
+  tidybayes::spread_draws(mu, sigma) %>% 
+  mutate(model = 'unrounded') 
+
+draws_all <- draws %>% 
+  bind_rows(draws_unrounded)
+```
+
+```{r draws_table, echo = FALSE}
+draws_all %>% 
+  filter(.draw <= 3) %>% 
+  select(-starts_with('.')) %>% 
+  kable(caption = 'First few draws from each model') %>% 
+  kable_styling(bootstrap_options = c("striped", "hover", "responsive"))
+```
+
+The contour plots look very similar but with $\sigma$ shifted upward when we treat the observations as unrounded measurements. This is contrary to my intuition about what should happen: by introducing uncertainty into our measurments, I would have thought we'd see more uncertainty in our parameter estimates.
+
+```{r contour_plot, echo = FALSE}
+draws_all %>% 
+  ggplot() +
+  aes(x = mu, y = sigma) +
+  stat_density_2d(aes(fill = stat(level)), geom = "polygon") +
+  facet_wrap(~model) +
+  labs(
+    x = 'μ',
+    y = 'σ',
+    title = 'Joint posterior',
+    subtitle = 'p(μ, σ | y)'
+  ) +
+  NULL
+
+```
+
+The density for $\mu \mid y$ look much the same in both models. This is expected because the rounded measurement is the mean of all possible unrounded measurements.
+
+```{r mu_plot, echo = FALSE}
+draws_all %>% 
+  ggplot() +
+  aes(mu, fill = model) +
+  geom_histogram(position = 'identity', bins = 50, alpha = 0.5) +
+  scale_x_continuous(breaks = seq(0, 20), limits = c(7, 14)) +
+  labs(
+    x = 'μ',
+    y = 'Count',
+    title = 'Marginal posterior of μ',
+    subtitle = str_glue(paste(
+      'p(μ | y)',
+      sep = '\n'
+    ))
+  )
+```
+
+The marginal posterior for $\sigma$ again shows a decrease when taking rounding error into account. I'm not sure why that would happen.
+
+```{r sigma_plot, echo = FALSE}
+draws_all %>% 
+  ggplot() +
+  aes(sigma, fill = model) +
+  geom_histogram(position = 'identity', alpha = 0.5, bins = 50) +
+  scale_x_continuous(breaks = seq(0, 20, 0.5), limits = c(0, 5)) +
+  labs(
+    x = 'σ',
+    y = 'Count',
+    title = 'Marginal posterior of σ',
+    subtitle = str_glue(paste(
+      'p(σ | y)',
+      sep = '\n'
+    ))
+  )
+```
+
+```{r sigma_quantiles, echo = FALSE}
+p <- c(0.05, 0.50, 0.95)
+
+draws_all %>% 
+  group_by(model) %>% 
+  summarise(
+    quantiles = list(percent(p)),
+    value = list(quantile(sigma, p))
+  ) %>% 
+  unnest() %>% 
+  spread(quantiles, value) %>% 
+  kable(caption = 'Quantiles for σ | y') %>% 
+  kable_styling(bootstrap_options = c("striped", "hover", "responsive"))
+
+```
+
+
+Finally, let's calculate the posterior for $\theta := (z_1 - z_2)^2$ (assuming we observe rounded measurements). 
+
+```{r sims}
+sims <- draws %>% 
+  mutate(theta = (z1 - z2)^2) 
+```
+
+```{r sims_plot, echo = FALSE}
+sims %>% 
+  ggplot() +
+  aes(theta) +
+  geom_histogram(bins = 50, fill = 'skyblue') +
+  labs(
+    x = 'θ',
+    y = 'Count',
+    title = 'Posterior draws for θ',
+    subtitle = 'p(θ | y)'
+  )
+```
+
+
+There is a lot of mass near 0 because the observed rounded measurments are the same for $z_1$ and $z_2$. The probability density is also entirely less than 1 because the rounding is off by at most 0.5 in any direction.
+

@@ -1,0 +1,227 @@
+---
+title: "BDA3 Chapter 3 Exercise 8"
+author: "Brian Callander"
+date: "2018-10-21"
+tags: bda chapter 3, solutions, bayes, poisson
+always_allow_html: yes
+output: 
+  md_document:
+    variant: markdown
+    preserve_yaml: yes
+---
+
+Here's my solution to exercise 8, chapter 3, of [Gelman's](https://andrewgelman.com/) *Bayesian Data Analysis* (BDA), 3rd edition. There are [solutions](http://www.stat.columbia.edu/~gelman/book/solutions.pdf) to some of the exercises on the [book's webpage](http://www.stat.columbia.edu/~gelman/book/).
+
+<!--more-->
+
+<div style="display:none">
+  $\DeclareMathOperator{\dbinomial}{Binomial}
+   \DeclareMathOperator{\dbern}{Bernoulli}
+   \DeclareMathOperator{\dpois}{Poisson}
+   \DeclareMathOperator{\dnorm}{Normal}
+   \DeclareMathOperator{\dt}{t}
+   \DeclareMathOperator{\dcauchy}{Cauchy}
+   \DeclareMathOperator{\dexponential}{Exp}
+   \DeclareMathOperator{\duniform}{Uniform}
+   \DeclareMathOperator{\dgamma}{Gamma}
+   \DeclareMathOperator{\dinvgamma}{InvGamma}
+   \DeclareMathOperator{\invlogit}{InvLogit}
+   \DeclareMathOperator{\logit}{Logit}
+   \DeclareMathOperator{\ddirichlet}{Dirichlet}
+   \DeclareMathOperator{\dbeta}{Beta}$
+</div>
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(
+  echo = TRUE,
+  comment = NA,
+  message = FALSE,
+  warning = FALSE,
+  error = TRUE,
+  # cache = TRUE,
+  dev = "svglite",
+  fig.ext = ".svg" 
+)
+
+library(tidyverse)
+library(scales)
+library(kableExtra)
+
+library(rstan)
+library(tidybayes)
+
+rstan_options(auto_write = TRUE)
+options(mc.cores = parallel::detectCores())
+
+theme_set(theme_bw())
+
+```
+
+```{r make_data, include = FALSE}
+df0 <- 
+  list(
+    tibble(
+      type = 'residential',
+      bike_route = TRUE,
+      bikes = c(16, 9, 10, 13, 19, 20, 18, 17, 35, 55),
+      other = c(58, 90, 48, 57, 103, 57, 86, 112, 273, 64)
+    ),
+    tibble(
+      type = 'residential',
+      bike_route = FALSE,
+      bikes = c(12, 1, 2, 4, 9, 7, 9, 8),
+      other = c(113, 18, 14, 44, 208, 67, 29, 154)
+    ),
+    tibble(
+      type = 'fairly_busy',
+      bike_route = TRUE,
+      bikes = c(8, 35, 31, 19, 38, 47, 44, 44, 29, 18),
+      other = c(29, 415, 425, 42, 180, 675, 620, 437, 47, 462)
+    ),
+    tibble(
+      type = 'fairly_busy',
+      bike_route = FALSE,
+      bikes = c(10, 43, 5, 14, 58, 15, 0, 47, 51, 32),
+      other = c(557, 1258, 499, 601, 1163, 700, 90, 1093, 1459, 1086)
+    ),
+    tibble(
+      type = 'busy',
+      bike_route = TRUE,
+      bikes = c(60, 51, 58, 59, 53, 68, 68, 60, 71, 63),
+      other = c(1545, 1499, 1596, 503, 407, 1494, 1558, 1706, 476, 725)
+    ),
+    tibble(
+      type = 'busy',
+      bike_route = FALSE,
+      bikes = c(8, 9, 6, 9, 19, 61, 31, 75, 14, 25),
+      other = c(1248, 1246, 1596, 1765, 1290, 2498, 2346, 3101, 1918, 2318)
+    )
+  ) %>% 
+  reduce(bind_rows) %>% 
+  mutate(
+    type = as_factor(type, 
+                     levels = c('residential', 'fairly_busy', 'busy'), 
+                     ordered = TRUE
+                    ),
+    bikes = as.integer(bikes),
+    other = as.integer(other)
+  )
+
+df0 %>% 
+  write_csv('data/chapter_03_exercise_08.csv')
+
+```
+
+You can download the [full dataset shown in table 3.3](data/chapter_03_exercise_08.csv). Let's load it into a dataframe and select just the residential data, as suggested.
+
+```{r data}
+df0 <- read_csv('data/chapter_03_exercise_08.csv') %>% 
+  mutate(
+    type = as_factor(
+      type, 
+      levels = c('residential', 'fairly_busy', 'busy'), 
+      ordered = TRUE
+    ),
+    bikes = as.integer(bikes),
+    other = as.integer(other)
+  )
+
+df <- df0 %>% 
+  filter(type == 'residential') %>% 
+  mutate(
+    total = bikes + other,
+    bike_fraction = bikes / total,
+    other_fraction = other / total
+  )
+```
+
+Here are the first few rows with each value of `bike_route`.
+
+```{r data_table, echo = FALSE}
+df %>% 
+  group_by(bike_route) %>% 
+  filter(1:n() < 4) %>% 
+  kable() %>% 
+  kable_styling(bootstrap_options = c('hover', 'striped', 'responsive'))
+```
+
+We'll use an uninformative gamma prior with a Poisson likelihood for the counts. The posterior can then be calculated as follows.
+
+```{r posterior}
+draws <- 10000
+
+shape_prior <- 2
+rate_prior <- 0
+
+posterior <- function(data, draws = 10000) {
+  
+  bikes <- data %>% pull(bikes)
+  other <- data %>% pull(other)
+  n <- data %>% pull(n)
+  
+  tibble(draw = 1:draws) %>%
+    mutate(
+      theta_bike = rgamma(draws, bikes, n),
+      theta_other = rgamma(draws, other, n),
+      mu = rpois(draws, theta_bike),
+      p = theta_bike / (theta_bike + theta_other)
+    )
+  
+}
+
+posterior_draws <- df %>% 
+  group_by(bike_route) %>% 
+  summarise(
+    bikes = sum(bikes) + shape_prior,
+    other = sum(other) + shape_prior,
+    n = n() + rate_prior
+  ) %>% 
+  nest(-bike_route) %>% 
+  mutate(draws = map(data, posterior, draws)) %>% 
+  unnest(draws)
+
+```
+
+Plotting posterior predictive draws of $\theta_y$ and $\theta_z$, we can see that there seems to be quite a difference.
+
+```{r posterior_predictive_plot}
+posterior_draws %>% 
+  ggplot() +
+  aes(mu, fill = bike_route) +
+  geom_bar(position = 'identity', alpha = 0.75) +
+  labs(
+    x = 'Bike count',
+    y = 'Count',
+    fill = 'Has bike route?',
+    title = 'Posterior expectation of bike count'
+  )
+```
+
+To quantify this difference, we'll have to match up our posterior draws for $\theta_y$ and $\theta_z$.
+
+```{r difference}
+difference <- posterior_draws %>% 
+  select(draw, bike_route, mu) %>% 
+  spread(bike_route, mu) %>% 
+  mutate(difference = `TRUE` - `FALSE`) 
+```
+
+```{r difference_plot, echo = FALSE}
+difference %>% 
+  ggplot() +
+  aes(difference) +
+  geom_bar() +
+  labs(
+    x = 'Difference',
+    y = 'Count',
+    title = 'Posterior predictive distribution of the difference in means'
+  )
+```
+
+The difference $\mu_y - \mu_z$ has the following 95% credible interval:
+
+```{r}
+difference %>% 
+  pull(difference) %>% 
+  quantile(probs = c(0.05, 0.5, 0.95))
+```

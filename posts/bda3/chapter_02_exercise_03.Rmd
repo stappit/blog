@@ -1,0 +1,96 @@
+---
+title: "BDA3 Chapter 2 Exercise 3"
+author: "Brian Callander"
+date: "2018-08-22"
+tags: binomial, bayes, solutions, bda chapter 2, bda, normal approximation
+always_allow_html: yes
+output: 
+  md_document:
+    variant: markdown
+    preserve_yaml: yes
+---
+
+Here's my solution to exercise 3, chapter 2, of [Gelman's](https://andrewgelman.com/) *Bayesian Data Analysis* (BDA), 3rd edition. There are [solutions](http://www.stat.columbia.edu/~gelman/book/solutions.pdf) to some of the exercises on the [book's webpage](http://www.stat.columbia.edu/~gelman/book/).
+
+<!--more-->
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(
+  echo = TRUE,
+  comment = NA,
+  message = FALSE,
+  warning = FALSE,
+  error = TRUE,
+  cache = TRUE
+)
+
+library(tidyverse)
+library(rstan)
+library(tidybayes)
+library(kableExtra)
+
+theme_set(theme_bw())
+
+options(mc.cores = parallel::detectCores())
+rstan_options(auto_write = TRUE)
+
+```
+
+<div style="display:none">
+  $\DeclareMathOperator{\dbinomial}{binomial}
+   \DeclareMathOperator{\dbern}{Bernoulli}
+   \DeclareMathOperator{\dbeta}{beta}$
+</div>
+
+
+For 1000 rolls of a fair die, The mean number of sixs is 1000/6 = `r signif(1000/6)`, the variance is `r signif(1000 * 5 / 36)`, and the standard deviation is `r signif(sqrt(1000 * 5 / 36))`. Let's compare the binomial distribution to the normal approximation.
+
+```{r ex3_data}
+N <- 1000
+p <- 1 / 6
+mu <- N * p
+sigma <- sqrt(N * p * (1 - p))
+
+ex3 <- tibble(
+    y = seq(0, N),
+    binomial = dbinom(y, N, p),
+    normal_approx = dnorm(y, mu, sigma)
+  ) %>% 
+  gather(metric, probability, -y) 
+```
+
+```{r ex3_table, echo = FALSE}
+ex3 %>% 
+  head() %>% 
+  kable() %>% kable_styling()
+```
+
+```{r ex3_plot, echo = FALSE}
+ex3 %>% 
+  ggplot() +
+  aes(y, probability, colour = metric) +
+  geom_line() +
+  scale_x_continuous(limits = c(100, 250)) +
+  labs(
+    x = 'y',
+    y = 'Prior predictive probability of y',
+    title = 'Normal approximation of the binomial distribution',
+    subtitle = 'Comparison of the prior predictive probabilities'
+  ) +
+  NULL
+
+```
+
+The two curves are visually indistinguishable. The percentiles are listed in the table below.
+
+```{r ex3_percentiles}
+percentiles <- c(0.05, 0.25, 0.5, 0.75, 0.95)
+
+tibble(
+    percentile = scales::percent(percentiles),
+    binom = qbinom(percentiles, N, p),
+    norm = qnorm(percentiles, mu, sigma)
+) %>% kable() %>% kable_styling()
+```
+
+

@@ -1,0 +1,370 @@
+---
+title: "BDA3 Chapter 2 Exercise 13"
+author: "Brian Callander"
+date: "2018-09-02"
+tags: bda chapter 2, solutions, bayes, poisson, gamma, jeffrey prior, posterior predictive
+always_allow_html: yes
+output: 
+  md_document:
+    variant: markdown
+    preserve_yaml: yes
+---
+
+Here's my solution to exercise 13, chapter 2, of [Gelman's](https://andrewgelman.com/) *Bayesian Data Analysis* (BDA), 3rd edition. There are [solutions](http://www.stat.columbia.edu/~gelman/book/solutions.pdf) to some of the exercises on the [book's webpage](http://www.stat.columbia.edu/~gelman/book/).
+
+<!--more-->
+
+<div style="display:none">
+  $\DeclareMathOperator{\dbinomial}{binomial}
+   \DeclareMathOperator{\dbern}{Bernoulli}
+   \DeclareMathOperator{\dpois}{Poisson}
+   \DeclareMathOperator{\dnorm}{normal}
+   \DeclareMathOperator{\dcauchy}{Cauchy}
+   \DeclareMathOperator{\dgamma}{gamma}
+   \DeclareMathOperator{\invlogit}{invlogit}
+   \DeclareMathOperator{\logit}{logit}
+   \DeclareMathOperator{\dbeta}{beta}$
+</div>
+
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(
+  echo = TRUE,
+  comment = NA,
+  message = FALSE,
+  warning = FALSE,
+  error = TRUE,
+  dev = "svglite",
+  fig.ext = ".svg" 
+)
+
+library(tidyverse)
+library(scales)
+library(kableExtra)
+
+theme_set(theme_bw())
+
+```
+
+We are given data on airline deaths and asked to fit various models to that data.
+
+## The data
+
+We are given the data shown below. The data didn't seem to be available anywhere so I [created the csv file](/data/bda3_chapter_02_exercise_13.csv) myself.
+
+```{r data, include = FALSE}
+df <- tibble(
+  year = 1976:1985,
+  fatal_accidents = c(24, 25, 31, 31, 22, 21, 26, 20, 16, 22) %>% as.integer(),
+  passenger_deaths = c(734, 516, 754, 877, 814, 362, 764, 809, 223, 1066) %>% as.integer(),
+  death_rate = c(0.19, 0.12, 0.15, 0.16, 0.14, 0.06, 0.13, 0.13, 0.03, 0.15)
+)
+
+write_csv(df, 'data/chapter_02_exercise_13.csv')
+```
+
+```{r data_table, echo = FALSE}
+df %>% 
+  kable() %>% 
+  kable_styling(
+    bootstrap_options = c("striped", "hover", "condensed", "responsive"), 
+    full_width = TRUE,
+    position = 'center'
+  )
+```
+
+Let's get acquainted with the data by plotting it as a timeseries.
+
+```{r data_plot, fig.height = 5, echo = FALSE}
+df %>% 
+  gather(metric, value, -year) %>% 
+  ggplot() +
+  aes(year, value) +
+  geom_line() +
+  scale_x_continuous(breaks = seq(1976, 1984, 1)) +
+  facet_grid(metric~., scales = 'free_y') +
+  labs(
+    x = 'Year',
+    y = 'Value',
+    colour = 'Metric',
+    title = 'Worldwide airline fatalities, 1976-1985',
+    subtitle = paste(
+      "The y-axes don't start at 0",
+      "Death rate is passenger deaths per 100 million passenger miles",
+      sep = "\n"
+    ),
+    caption = 'Source: Statistical Abstract of the United States (via BDA3)'
+  )
+  
+
+```
+
+## Part a
+
+We model the number of fatal accidents as poisson $y \mid \theta \sim \dpois(\theta)$, where we put a  $\theta \sim \dgamma(\alpha, \beta)$ prior on the parameter. I don't really have any strong prior knowledge about the number of annual fatal flight accidents. I'll use the gamma approximation to Jeffrey's prior from the [previous exercise](./chapter_02_exercise_12.html), even though it places probability on very extreme values. We'll stick with this prior throughout.
+
+```{r prior}
+shape <- 0.5
+rate <- .Machine$double.xmin
+```
+
+
+```{r prior_a, echo = FALSE}
+tibble(theta = 0:100, density = dgamma(theta, shape, rate)) %>% 
+  ggplot() +
+  aes(theta, density) +
+  geom_area(fill = 'skyblue', colour = 'white') +
+  labs(
+    x = 'θ',
+    y = 'Probability density',
+    title = str_glue("Non-informative prior: θ ~ gamma({shape}, {signif(rate, digits = 2)})"),
+    subtitle = 'Truncated at 100'
+  )
+
+```
+
+The posterior is $\dgamma(0.5 + n\bar y, n) = \dgamma(0.5 + 238, 10)$.
+
+```{r posterior_a, echo = FALSE}
+sum_fatal_accidents <- sum(df$fatal_accidents)
+n_observations <- nrow(df)
+
+tibble(
+    theta = seq(0, 100, 0.01), 
+    density = dgamma(theta, shape + sum_fatal_accidents, rate + n_observations)
+  ) %>% 
+  ggplot() +
+  aes(theta, density) +
+  geom_area(fill = 'skyblue', colour = 'white') +
+  labs(
+    x = 'θ',
+    y = 'Probability density',
+    title = str_glue('Posterior distribution: gamma(238.5, 10)'),
+    caption = 'part a'
+  )
+
+```
+
+To obtain a 95% posterior predictive interval, we draw $\theta$ from its posterior, then draw $y$ from the corresponding Poisson distribution. With these draws, we can obtain the necessary quantiles.
+
+```{r ci_a}
+n_draws <- 50000
+
+theta_posterior_a <- rgamma(n_draws, 
+                            shape + sum_fatal_accidents, 
+                            rate + n_observations
+                           ) 
+y_pp_a <- rpois(n_draws, theta_posterior_a) 
+
+mu_a <- mean(y_pp_a)
+ci_a <- quantile(y_pp_a, c(0.05, 0.95))
+
+ci_a
+```
+
+```{r pp_plot_a, echo = FALSE}
+tibble(y = y_pp_a) %>% 
+  ggplot() +
+  aes(y) +
+  geom_bar() +
+  labs(
+    x = 'y',
+    y = 'Frequency',
+    title = 'Fatal accidents: posterior predictive distribution',
+    subtitle = str_glue(paste(
+      "Predictive mean: {signif(mu_a, digits = 4)}",
+      "95% predictive interval: [{ci_a[1]}, {ci_a[2]}]",
+      sep = "\n"
+    )),
+    caption = 'part a'
+  )
+
+```
+
+
+## Part b
+
+In part a, we ignored how many flights there are. We can incorporate this information into our model by using `passenger_miles` as a measure of exposure. The parameter $\theta$ is now the rate of fatal accidents per year per 100 million passenger miles. Note that this rate is over an order of magnitude smaller than the death rate in the table because the number of fatal accidents is an order of magnitude smaller than the number of passenger deaths. The posterior is $\theta \mid y \sim \dgamma(0.5 + 238, 57158.69)$.
+
+```{r posterior_b, echo = FALSE}
+sum_passenger_miles <- df %>% 
+  transmute(passenger_miles = passenger_deaths / death_rate) %>% 
+  summarise(sum(passenger_miles)) %>% 
+  pull()
+
+tibble(
+    theta = seq(0, 0.01, 0.00001), 
+    density = dgamma(theta, shape + sum_fatal_accidents, rate + sum_passenger_miles)
+  ) %>% 
+  ggplot() +
+  aes(theta, density) +
+  geom_area(fill = 'skyblue') +
+  scale_x_continuous(limits = c(0.002, 0.007)) +
+  labs(
+    x = "θ",
+    y = "Probability density",
+    title = str_glue(
+      "Posterior distribution: θ | y ~ gamma(0.5 + {sum_fatal_accidents}, {round(sum_passenger_miles, digits = 1)})"
+    ),
+    caption = "part b"
+  )
+
+```
+
+The 95% posterior predictive interval seems to be shifted upwards compared to the interval in part a.
+
+```{r ci_b}
+theta_posterior_b <- rgamma(n_draws, 
+                            shape + sum_fatal_accidents, 
+                            rate + sum_passenger_miles
+                           )
+y_pp_b <- rpois(n_draws, theta_posterior_b * 8000)
+
+mu_b <- mean(y_pp_b)
+
+ci_b <- quantile(y_pp_b, c(0.05, 0.95))
+
+ci_b
+```
+
+```{r pp_plot_b, echo = FALSE}
+tibble(y = y_pp_b) %>% 
+  ggplot() +
+  aes(y) +
+  geom_bar() +
+  labs(
+    x = 'y',
+    y = 'Frequency',
+    title = 'Posterior predictive distribution',
+    subtitle = str_glue(paste(
+      "Predictive mean: {signif(mu_b, digits = 4)}",
+      "95% predictive interval: [{ci_b[1]}, {ci_b[2]}]",
+      sep = "\n"
+    )),
+    caption = 'part b'
+  )
+
+```
+
+## Part c
+
+Here we use the same model as in part a but for the number of passenger deaths instead of fatal accidents.
+
+```{r posterior_c, echo = FALSE}
+sum_passenger_deaths <- sum(df$passenger_deaths)
+
+tibble(
+    theta = seq(500, 1000, 0.1), 
+    density = dgamma(theta, shape + sum_passenger_deaths, rate + n_observations)
+  ) %>% 
+  ggplot() +
+  aes(theta, density) +
+  geom_area(fill = 'skyblue', colour = 'white') +
+  labs(
+    x = 'θ',
+    y = 'Probability density',
+    title = str_glue('Posterior distribution: θ | y ~ gamma(0.5 + {sum_passenger_deaths}, {n_observations})'),
+    caption = 'part c'
+  )
+
+```
+
+Only 1 of the 10 observations in the dataset lie within the 95% posterior predictive interval.
+
+```{r ci_c}
+theta_posterior_c <- rgamma(n_draws, 
+                            shape + sum_passenger_deaths, 
+                            rate + n_observations
+                           )
+y_pp_c <- rpois(n_draws, theta_posterior_c) 
+
+mu_c <- mean(y_pp_c)
+ci_c <- quantile(y_pp_c, c(0.05, 0.95))
+
+ci_c
+```
+
+```{r pp_plot_c, echo = FALSE}
+tibble(y = y_pp_c) %>% 
+  ggplot() +
+  aes(y) +
+  geom_bar() +
+  labs(
+    x = 'y',
+    y = 'Frequency',
+    title = 'Posterior predictive distribution',
+    subtitle = str_glue(paste(
+      "Predictive mean: {signif(mu_c, digits = 4)}",
+      "95% predictive interval: [{ci_c[1]}, {ci_c[2]}]",
+      sep = "\n"
+    )),
+    caption = 'part c'
+  )
+
+```
+
+
+## Part d
+
+Now we use the same model as in part b but for passenger deaths instead of fatal accidents. The posterior is $\dgamma(0.5 + 238, 57158.69)$.
+
+```{r posterior_d, echo = FALSE}
+sum_passenger_deaths <- df %>% 
+  summarise(sum(passenger_deaths)) %>% 
+  pull()
+
+tibble(
+    theta = seq(0.1, 0.15, 0.0001), 
+    density = dgamma(theta, shape + sum_passenger_deaths, rate + sum_passenger_miles)
+  ) %>% 
+  ggplot() +
+  aes(theta, density) +
+  geom_area(fill = 'skyblue', colour = 'white') +
+  labs(
+    x = 'θ',
+    y = 'Probability density',
+    title = str_glue('Posterior distribution: θ | y ~ gamma(0.5 + {sum_passenger_deaths}, {round(sum_passenger_miles, digits = 1)})'),
+    caption = 'part d'
+  )
+
+```
+
+None of the observed values falls into the 95% posterior predictive interval.
+
+```{r, ci_d}
+theta_posterior_d <- rgamma(n_draws, 
+                            shape + sum_passenger_deaths, 
+                            rate + sum_passenger_miles
+                           )
+y_pp_d <- rpois(n_draws, theta_posterior_d * 8000)
+
+mu_d <- mean(y_pp_d)
+
+ci_d <- quantile(y_pp_d, c(0.05, 0.95))
+
+ci_d
+```
+
+```{r pp_plot_d, echo = FALSE}
+tibble(y = y_pp_d) %>% 
+  ggplot() +
+  aes(y) +
+  geom_bar() +
+  labs(
+    x = 'y',
+    y = 'Frequency',
+    title = 'Posterior predictive distribution',
+    subtitle = str_glue(paste(
+      "Predictive mean: {signif(mu_d, digits = 4)}",
+      "95% predictive interval: [{ci_d[1]}, {ci_d[2]}]",
+      sep = "\n"
+    )),
+    caption = 'part d'
+  )
+
+```
+
+
+## Part e
+
+There are a number of issues to consider that are not mentioned in the question or suggested by the data. The number of fatal accidents depends on the number of miles flown by airplanes: if there are more flights, there will likely be more accidents. However, the number of flights isn't directly accounted for in the number of passenger miles since the number of passengers per flight can vary from year to year. In any case, the number of passenger deaths per year is not independent because passengers on the same flight will have more similar survival chances. 

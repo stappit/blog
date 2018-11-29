@@ -1,0 +1,146 @@
+---
+title: "BDA3 Chapter 3 Exercise 4"
+author: "Brian Callander"
+date: "2018-10-05"
+tags: bda chapter 3, solutions, bayes, odds ratio, noninformative priors
+always_allow_html: yes
+output: 
+  md_document:
+    variant: markdown
+    preserve_yaml: yes
+---
+
+Here's my solution to exercise 4, chapter 3, of [Gelman's](https://andrewgelman.com/) *Bayesian Data Analysis* (BDA), 3rd edition. There are [solutions](http://www.stat.columbia.edu/~gelman/book/solutions.pdf) to some of the exercises on the [book's webpage](http://www.stat.columbia.edu/~gelman/book/).
+
+<!--more-->
+
+<div style="display:none">
+  $\DeclareMathOperator{\dbinomial}{Binomial}
+   \DeclareMathOperator{\dbern}{Bernoulli}
+   \DeclareMathOperator{\dpois}{Poisson}
+   \DeclareMathOperator{\dnorm}{Normal}
+   \DeclareMathOperator{\dt}{t}
+   \DeclareMathOperator{\dcauchy}{Cauchy}
+   \DeclareMathOperator{\dexponential}{Exp}
+   \DeclareMathOperator{\dgamma}{Gamma}
+   \DeclareMathOperator{\dinvgamma}{InvGamma}
+   \DeclareMathOperator{\invlogit}{InvLogit}
+   \DeclareMathOperator{\logit}{Logit}
+   \DeclareMathOperator{\ddirichlet}{Dirichlet}
+   \DeclareMathOperator{\dbeta}{Beta}$
+</div>
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(
+  echo = TRUE,
+  comment = NA,
+  message = FALSE,
+  warning = FALSE,
+  error = TRUE,
+  dev = "svglite",
+  fig.ext = ".svg" 
+)
+
+library(tidyverse)
+library(scales)
+library(kableExtra)
+
+theme_set(theme_bw())
+
+```
+
+Suppose we have two independent trials where the likelihood of death is binomial, $y_i \mid p_0, p_1 \sim \dbinomial(n_i, p_i)$, $i = 0, 1$. We will compare two different non-informative priors on the odds ratio
+
+$$
+\theta
+:=
+\frac{p_0}{1 - p_0} / \frac{p_1}{1 - p_1} 
+.
+$$
+
+Here are the given data.
+
+```{r data}
+df <- tibble(
+    cohort = c('control', 'treatment'),
+    patients = c(674, 680),
+    deaths = c(39, 22)
+  ) %>% 
+  mutate(survived = patients - deaths)
+```
+
+```{r data_table, echo = FALSE}
+df %>% 
+  kable() %>% 
+  kable_styling()
+```
+
+We'll need a couple of functions for drawing random samples for $\theta$.
+
+```{r functions}
+odds <- function(p) p / (1 - p)
+
+simulate <- function(n, k, a, b, draws = 10000)
+  # draws from posterior
+  # n bernouille trials, k successes with beta(a, b) prior
+  tibble(
+    draw = 1:draws, 
+    value = rbeta(draws, k + a, n - k + b)
+  )
+
+posterior <- function(a, b, draws = 10000)
+  # random samples from theta posterior with beta(a, b) prior
+  df %>% 
+    transmute(
+      cohort,
+      draws = map2(patients, deaths, simulate, a, b, draws)
+    ) %>% 
+    unnest(draws) %>% 
+    spread(cohort, value) %>% 
+    mutate(theta = odds(control) / odds(treatment))
+```
+  
+Let's compare a uniform prior to a prior close to $\dbeta(0, 0)$.
+
+```{r posteriors}
+uni <- posterior(1, 1) %>% 
+  mutate(prior = 'uniform')
+
+zero <- posterior(0.000000001, 0.000000001) %>% 
+  mutate(prior = 'zero')
+
+posteriors <- bind_rows(uni, zero)
+```
+
+```{r posteriors_plot, echo = FALSE}
+posteriors %>% 
+  ggplot() +
+  aes(theta, fill = prior) +
+  geom_histogram(position = 'identity', alpha = 0.5, bins = 50) +
+  labs(
+    x = 'θ',
+    y = 'Count',
+    title = 'Comparison of non-informative priors on the posterior odds ratio'
+  )
+```
+
+Here are the 95% posterior credible intervals for $\theta$.
+
+```{r posteriors_quantiles}
+cis <- posteriors %>% 
+  group_by(prior) %>% 
+  summarise(
+    q05 = quantile(theta, 0.05),
+    q50 = quantile(theta, 0.5),
+    q95 = quantile(theta, 0.95)
+  )
+```
+
+```{r posteriors_quantiles_table, echo = FALSE}
+cis %>% 
+  kable() %>% 
+  kable_styling()
+```
+
+The estimates with the "zero" prior are slightly higher than those from the uniform prior, especially in the tails.
+

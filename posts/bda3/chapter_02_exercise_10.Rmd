@@ -1,0 +1,273 @@
+---
+title: "BDA3 Chapter 2 Exercise 10"
+author: "Brian Callander"
+date: "2018-09-01"
+tags: bda chapter 2, solutions, bayes, geometric, noninformative prior, jeffrey prior
+always_allow_html: yes
+output: 
+  md_document:
+    variant: markdown
+    preserve_yaml: yes
+---
+
+Here's my solution to exercise 10, chapter 2, of [Gelman's](https://andrewgelman.com/) *Bayesian Data Analysis* (BDA), 3rd edition. There are [solutions](http://www.stat.columbia.edu/~gelman/book/solutions.pdf) to some of the exercises on the [book's webpage](http://www.stat.columbia.edu/~gelman/book/).
+
+<!--more-->
+
+<div style="display:none">
+  $\DeclareMathOperator{\dbinomial}{binomial}
+   \DeclareMathOperator{\dbern}{Bernoulli}
+   \DeclareMathOperator{\dnorm}{normal}
+   \DeclareMathOperator{\dgamma}{gamma}
+   \DeclareMathOperator{\invlogit}{invlogit}
+   \DeclareMathOperator{\logit}{logit}
+   \DeclareMathOperator{\dbeta}{beta}$
+</div>
+
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(
+  echo = TRUE,
+  comment = NA,
+  message = FALSE,
+  warning = FALSE,
+  error = TRUE,
+  cache = TRUE
+)
+
+library(tidyverse)
+library(kableExtra)
+
+theme_set(theme_bw())
+
+```
+
+## The posterior density
+
+There an N cars labelled 1 to N and we observe a random car labelled 203. With a geometric prior with mean 100, the unnormalised posterior is
+
+$$
+p(N \mid y = 203)
+\propto
+p(y = 203 \mid N) \cdot p (N)
+= 
+\left.
+  \begin{cases}
+    \frac{1}{N} \cdot \frac{1}{100} \cdot \left( \frac{99}{100} \right)^{N - 1} 
+    & 
+    \text{for } 203 \le N 
+    \\
+    0
+    &
+    \text{otherwise}
+  \end{cases}
+\right\}
+$$
+
+We find the normalising constant in two steps. First set $x := \frac{99}{100}$ and use the [Taylor series](https://en.wikipedia.org/wiki/Taylor_series#Natural_logarithm) of $\log(1 - x)$ to show 
+
+$$
+\begin{align}
+  \sum_1^\infty \frac{1}{N} \cdot \frac{1}{100}\cdot \left( \frac{99}{100} \right)^{N - 1}
+  &=
+  \frac{1}{100} \left( 1 + \frac{x}{2} + \frac{x^2}{3} + \dotsc + \frac{x^k}{k + 1} + \dotsc \right)
+  \\
+  &=
+  \frac{1}{100} \frac{1}{x} \left(  x + \frac{x^2}{2} + \frac{x^3}{3} + \dotsc + \frac{x^k}{k} + \dotsc   \right)
+  \\
+  &=
+  -\frac{1}{100} \frac{1}{x} \log (1 - x)
+  \\
+  &=
+  \frac{\log 100}{99} 
+  .
+\end{align}
+$$
+
+The normalising constant $c$ is then
+
+$$
+  c
+  =
+  \frac{\log 100}{99} 
+  -
+  \sum_1^{202} \frac{1}{N} \cdot \frac{1}{100}\cdot \left( \frac{99}{100} \right)^{N - 1}
+$$
+
+which we approximate with the following computation.
+
+```{r normalising_constant}
+# value of the Nth term in the sum
+term <- function(N) 
+  (1 / N) * (1 / 100) * (99 / 100)^(N - 1) 
+
+# left hand side
+c0 <- log(100) / 99
+
+# right hand side (the sum)
+c1 <- 1:202 %>% 
+  map(term) %>% 
+  reduce(sum)
+  
+c <- c0 - c1
+
+c
+```
+
+
+## The posterior moments
+
+The posterior mean is 
+
+$$
+\begin{align}
+  \mathbb E(N \mid y = 203)
+  &=
+  \frac{1}{c}\sum_{203}^\infty \frac{N}{N} \cdot \frac{1}{100} \cdot \left( \frac{99}{100} \right)^{N - 1}
+  \\
+  &=
+  \frac{1}{100c} \left( x^{202} + x^{203} + \dotsc \right), \qquad x := \frac{99}{100}
+  \\
+  &=
+  \frac{1}{100c} \left( \frac{1}{1 - x} - (1 + x + x^2 + \dotsc + x^{201}) \right)
+  \\
+  &=
+  \frac{1}{100c} \left( \frac{1}{1 - x} - \frac{1 - x^{202}}{1 - x} \right)
+  \\
+  &=
+  \frac{1}{100c} \frac{x^{202}}{1 - x}
+  \\
+  &=
+  \frac{1}{c}\left( \frac{99}{100} \right)^{202}
+\end{align}
+,
+$$
+
+which is approximately 
+
+```{r posterior_mean}
+mu <- (1 / c) * (99 / 100)^202
+mu
+```
+
+This is larger than the prior mean of 100.
+
+The second moment is
+
+$$
+\begin{align}
+  \mathbb E(N^2 \mid y = 203)
+  &=
+  \frac{1}{c}\sum_{203}^\infty \frac{N^2}{N} \cdot \frac{1}{100} \cdot \left( \frac{99}{100} \right)^{N - 1}
+  \\
+  &=
+  \frac{1}{100c} \left( 203x^{202} + 204x^{203} + \dotsc \right), \qquad x := \frac{99}{100}
+  \\
+  &=
+  \frac{1}{100c} \left( \frac{1}{(1 - x)^2} - \left(1 + 2x + 3x^2 + \dotsc + 202 x^{201} \right) \right)
+  \\
+  &=
+  \frac{1}{100c} \left( 100^2 - \left(1 + 2x + 3x^2 + \dotsc + 202 x^{201} \right) \right)
+  \\
+  &=
+  \frac{100}{c}  - \frac{1 + 2x + 3x^2 + \dotsc + 202 x^{201} }{100c}
+\end{align}
+,
+$$
+
+which we approximate with the following code.
+
+```{r second_moment}
+EN2_left <- 100 / c
+
+EN2_right <- 1:201 %>% 
+  map(function(N) N * (99 / 100)^(N - 1)) %>% 
+  reduce(sum) %>% 
+  `/`(100 * c)
+
+EN2 <- EN2_left - EN2_right
+
+EN2
+```
+
+It follows that the posterior variance and standard deviation is approximately 
+
+```{r}
+v <- EN2 - mu^2
+sigma <- sqrt(v)
+c(v, sigma)
+```
+
+These are smaller than the prior variance and standard deviation, respectively:
+
+```{r prior_variance}
+v_prior <- (99 / 100) / (0.01^2)
+sigma_prior <- sqrt(v_prior)
+c(v_prior, sigma_prior)
+```
+
+## A non-informative prior
+
+There is no proper uniform density over the positive integers. A uniform prior also leaves us with an improper posterior. 
+
+Jeffrey's prior is $p(N) \propto \frac{1}{N}$, which is also improper. However, it yields the following (unnormalised) posterior
+
+$$
+p(N \mid y = 203)
+\propto
+\left.
+  \begin{cases}
+    \frac{1}{N^2} 
+    & 
+    \text{for } 203 \le N 
+    \\
+    0
+    &
+    \text{otherwise}
+  \end{cases}
+\right\}
+$$
+
+which is proper.
+
+Using the [Basel problem](https://en.wikipedia.org/wiki/Basel_problem) we can calculate the normalising constant
+
+$$
+c
+=
+\sum_1^\infty \frac{1}{N^2}
+-
+\sum_1^{202} \frac{1}{N^2}
+=
+\frac{\pi^2}{6}
+-
+\sum_1^{202} \frac{1}{N^2}
+$$
+
+which is approximately
+
+```{r}
+c_left <- pi^2 / 6
+
+c_right <- 1:202 %>% 
+  map(function(N) 1 / N^2) %>% 
+  reduce(sum)
+
+c <- c_left - c_right
+
+c
+```
+
+
+The posterior mean is not well-defined since
+
+$$
+\mathbb E(N \mid y = 203)
+=
+\frac{1}{c}\sum_{203}^\infty \frac{1}{N} 
+=
+\infty
+.
+$$
+
+The posterior variance and standard deviation are also not well-defined.
