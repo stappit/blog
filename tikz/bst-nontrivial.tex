@@ -1,0 +1,30 @@
+\documentclass[crop]{standalone}
+
+\usepackage[usenames,dvipsnames]{xcolor}
+\usepackage{tikz}
+
+\input{tree.tikz}
+
+\begin{document}
+
+\begin{tikzpicture}
+  \node [N] {1}
+    child{ node [N] {0} 
+      child{ node [E] { } }
+      child{ node [E] { } }
+    }
+    child{ node [N] {2} 
+      child{ node [E] { } }
+      child{ node [N] {4} 
+        child{ node [N] {3} 
+          child{ node [E] { } }
+          child{ node [E] { } }
+        }
+	child{ node [E] { } }
+      }
+    }
+    ; 
+\end{tikzpicture}
+
+\end{document}
+

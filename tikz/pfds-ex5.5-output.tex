@@ -1,0 +1,21 @@
+\documentclass[crop]{standalone}
+
+\usepackage[usenames,dvipsnames]{xcolor}
+\usepackage{tikz}
+
+\input{tree.tikz}
+
+\begin{document}
+
+\begin{tikzpicture} 
+  \node (fst) [N,label=180:{$t_s=$}] {$y$}
+	child{ node [SUBTREE] {$a_1$} }
+	child{ node [SUBTREE] {$p_s$} }
+    ; 
+  \node [below=of fst,N,label=180:{$t_b=$}] {$x$}
+	child{ node [SUBTREE] {$p_b$} }
+	child{ node [SUBTREE] {$b$} }
+    ; 
+\end{tikzpicture}
+
+\end{document}

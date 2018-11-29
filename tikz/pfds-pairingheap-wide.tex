@@ -1,0 +1,22 @@
+\documentclass[crop]{standalone}
+
+\usepackage[usenames,dvipsnames]{xcolor}
+\usepackage{tikz}
+
+\input{tree.tikz}
+
+\begin{document}
+
+\begin{tikzpicture}
+  \node [N,label=135:{$h=$}] {1}
+    child{ node [N] {7} }
+    child{ node [N] {6} }
+    child{ node [N] {5} }
+    child{ node [N] {4} }
+    child{ node [N] {3} }
+    child{ node [N] {2} }
+    ;
+\end{tikzpicture}
+
+\end{document}
+

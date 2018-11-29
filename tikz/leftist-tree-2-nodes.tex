@@ -1,0 +1,17 @@
+\documentclass[crop]{standalone}
+
+\usepackage[usenames,dvipsnames]{xcolor}
+\usepackage{tikz}
+
+\input{tree.tikz}
+
+\begin{document}
+
+\begin{tikzpicture} 
+  \node [N] {1}
+    child{ node [N] {1} }
+    child{ node [E] {} }
+    ; 
+\end{tikzpicture}
+
+\end{document}

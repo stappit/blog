@@ -1,0 +1,6 @@
+#
+# latexmk configuration options
+#
+$pdf_mode = "1";                        # make pdf
+$out_dir = "aux";                       # keep all auxilliary files in the subdirectory
+$pdflatex="pdflatex -interaction=nonstopmode %O %S";

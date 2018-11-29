@@ -1,0 +1,17 @@
+$for(posts)$
+  <div class="card post-item border-top-0 border-left-0 border-right-0"> 
+    <!--<div class="card-body">-->
+      <a href='$url$'>
+      <h5 class="card-title">$title$</h5>
+      </a>
+      <h6 class="card-subtitle text-muted">$date$</h6>
+      <p class="card-text post-body">
+      $if(teaser)$ 
+        $teaser$
+      $else$
+        </br>
+      $endif$
+      </p>
+    <!--</div>-->
+  </div>
+$endfor$

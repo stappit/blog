@@ -1,0 +1,26 @@
+\documentclass[crop]{standalone}
+
+\usepackage[usenames,dvipsnames]{xcolor}
+\usepackage{tikz}
+
+\input{tree.tikz}
+
+\begin{document}
+
+\begin{tikzpicture}[level/.style={sibling distance = 5cm/#1,level distance = 1.5cm}] 
+  \node [N] { }
+    child{ node [N] { } 
+      child{ node [N] { } 
+        child{ node [N] { } }
+      }
+      child{ node [N] { } }
+    }
+    child{ node [N] { } 
+      child{ node [N] { } }
+    }
+    child{ node [N] { } }
+    ; 
+\end{tikzpicture}
+
+\end{document}
+

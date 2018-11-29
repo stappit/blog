@@ -1,0 +1,46 @@
+\documentclass[crop]{standalone}
+
+
+\usepackage[usenames,dvipsnames]{xcolor}
+\usepackage{tikz}
+
+\input{tree.tikz}
+\input{red-black.tikz}
+
+\begin{document}
+
+\begin{tikzpicture} 
+  \node [BLACK] { }
+    child{ node [RED] { } 
+      child{ node [BLACK] { }
+        child{ node [E] { } }
+        child{ node [RED] { } 
+          child{ node [E] { } }
+          child{ node [E] { } }
+        }
+      }
+      child{ node [BLACK] { } 
+        child{ node [E] { } }
+        child{ node [E] { } }
+      }
+    }
+    child{ node [RED] { } 
+      child{ node [BLACK] { } 
+        child{ node [E] { } }
+        child{ node [E] { } }
+      }
+      child{ node [BLACK] { } 
+        child{ node [RED] { } 
+          child{ node [E] { } }
+          child{ node [E] { } }
+        }
+        child{ node [RED] { } 
+          child{ node [E] { } }
+          child{ node [E] { } }
+        }
+      }
+    }
+    ; 
+\end{tikzpicture}
+
+\end{document}

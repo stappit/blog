@@ -1,0 +1,20 @@
+\documentclass[crop]{standalone}
+
+\usepackage[usenames,dvipsnames]{xcolor}
+\usepackage{tikz}
+
+\input{tree.tikz}
+
+\begin{document}
+
+\begin{tikzpicture} 
+  \node [N] {$x$}
+    child{ node [N] {$y$} 
+	child{ node [SUBTREE] {$a$} }
+	child{ node [SUBTREE] {$b$} }
+    }
+    child{ node [E] { } }
+    ; 
+\end{tikzpicture}
+
+\end{document}
