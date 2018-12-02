@@ -1,28 +1,28 @@
 ---
-always_allow_html: True
-author: Brian Callander
-date: '2018-08-21'
-output:
+title: "BDA3 Chapter 2 Exercise 2"
+author: "Brian Callander"
+date: "2018-08-21"
+tags: stan, binomial, bayes, solutions, bda chapter 2, bda
+tldr: Here's my solution to exercise 2, chapter 2, of Gelman's Bayesian Data Analysis (BDA), 3rd edition.
+always_allow_html: yes
+output: 
   md_document:
-    preserve_yaml: True
     variant: markdown
-tags: 'stan, binomial, bayes, solutions, bda chapter 2, bda'
-title: BDA3 Chapter 2 Exercise 2
+    preserve_yaml: yes
 ---
 
-Here's my solution to exercise 2, chapter 2, of
-[Gelman's](https://andrewgelman.com/) *Bayesian Data Analysis* (BDA),
-3rd edition. There are
-[solutions](http://www.stat.columbia.edu/~gelman/book/solutions.pdf) to
-some of the exercises on the [book's
-webpage](http://www.stat.columbia.edu/~gelman/book/).
+Here's my solution to exercise 2, chapter 2, of [Gelman's](https://andrewgelman.com/) *Bayesian Data Analysis* (BDA), 3rd edition. There are [solutions](http://www.stat.columbia.edu/~gelman/book/solutions.pdf) to some of the exercises on the [book's webpage](http://www.stat.columbia.edu/~gelman/book/).
 
 <!--more-->
+
+
+
 <div style="display:none">
-
-$\DeclareMathOperator{\dbinomial}{binomial}  \DeclareMathOperator{\dbern}{Bernoulli}  \DeclareMathOperator{\dbeta}{beta}$
-
+  $\DeclareMathOperator{\dbinomial}{binomial}
+   \DeclareMathOperator{\dbern}{Bernoulli}
+   \DeclareMathOperator{\dbeta}{beta}$
 </div>
+
 
 We are given the following information about the two coins.
 
@@ -48,7 +48,8 @@ $$
   &=
   \frac{2}{25}
 \end{align}
-$$ $$
+$$
+$$
 \begin{align}
   p(C_2 \mid TT )
   &\propto
@@ -62,9 +63,7 @@ $$ $$
 \end{align}
 $$
 
-Both of the previous probabilities are normalised by the same constant.
-Since $p(C_1 \mid TT) + p(C_2 \mid TT) = 1$, the normalising constant is
-$\frac{2}{25} + \frac{9}{50} = \frac{13}{50}$. Thus
+Both of the previous probabilities are normalised by the same constant. Since $p(C_1 \mid TT) + p(C_2 \mid TT) = 1$, the normalising constant is $\frac{2}{25} + \frac{9}{50} = \frac{13}{50}$. Thus
 
 $$
 p(C_1 \mid TT) = \frac{4}{13}
@@ -74,10 +73,7 @@ p(C_1 \mid TT) = \frac{4}{13}
 p(C_2 \mid TT) = \frac{9}{13}.
 $$
 
-Let $y$ be the number of additional spins until the next head.
-Conditional on a coin, $y$ is
-[geometrically](https://en.wikipedia.org/wiki/Geometric_distribution)
-distributed. So the expected number of spins before the next head is:
+Let $y$ be the number of additional spins until the next head. Conditional on a coin, $y$ is [geometrically](https://en.wikipedia.org/wiki/Geometric_distribution) distributed. So the expected number of spins before the next head is:
 
 $$
 \begin{align}
@@ -103,3 +99,6 @@ $$
 $$
 
 which is 2.24359.
+
+
+

@@ -1,36 +1,32 @@
 ---
-always_allow_html: True
-author: Brian Callander
-date: '2018-08-26'
-output:
+title: "BDA3 Chapter 2 Exercise 7"
+author: "Brian Callander"
+date: "2018-08-26"
+tags: bda chapter 2, bda, solutions, bayes, binomial, natural parameter, exponential family, improper prior
+tldr: Here's my solution to exercise 7, chapter 2, of Gelman's Bayesian Data Analysis (BDA), 3rd edition.
+always_allow_html: yes
+output: 
   md_document:
-    preserve_yaml: True
     variant: markdown
-tags: |
-    bda chapter 2, bda, solutions, bayes, binomial, natural parameter,
-    exponential family, improper prior
-title: BDA3 Chapter 2 Exercise 7
+    preserve_yaml: yes
 ---
 
-Here's my solution to exercise 7, chapter 2, of
-[Gelman's](https://andrewgelman.com/) *Bayesian Data Analysis* (BDA),
-3rd edition. There are
-[solutions](http://www.stat.columbia.edu/~gelman/book/solutions.pdf) to
-some of the exercises on the [book's
-webpage](http://www.stat.columbia.edu/~gelman/book/).
+Here's my solution to exercise 7, chapter 2, of [Gelman's](https://andrewgelman.com/) *Bayesian Data Analysis* (BDA), 3rd edition. There are [solutions](http://www.stat.columbia.edu/~gelman/book/solutions.pdf) to some of the exercises on the [book's webpage](http://www.stat.columbia.edu/~gelman/book/).
 
 <!--more-->
+
 <div style="display:none">
-
-$\DeclareMathOperator{\dbinomial}{binomial}  \DeclareMathOperator{\dbern}{Bernoulli}  \DeclareMathOperator{\dgamma}{gamma}  \DeclareMathOperator{\invlogit}{invlogit}  \DeclareMathOperator{\logit}{logit}  \DeclareMathOperator{\dbeta}{beta}$
-
+  $\DeclareMathOperator{\dbinomial}{binomial}
+   \DeclareMathOperator{\dbern}{Bernoulli}
+   \DeclareMathOperator{\dgamma}{gamma}
+   \DeclareMathOperator{\invlogit}{invlogit}
+   \DeclareMathOperator{\logit}{logit}
+   \DeclareMathOperator{\dbeta}{beta}$
 </div>
 
-We show that a uniform prior on the natural parameter of a binomial
-model implies an improper prior under a different parameterisation.
+We show that a uniform prior on the natural parameter of a binomial model implies an improper prior under a different parameterisation.
 
-The binomial likelihood can be written as a member of the exponential
-family as
+The binomial likelihood can be written as a member of the exponential family as
 
 $$
 \begin{align}
@@ -47,10 +43,7 @@ $$
 \end{align}
 $$
 
-where $\phi(\theta) := \log \frac{\theta}{1 - \theta}$, $u(y) := y$,
-$g(\theta) := (1 - \theta)^n$. Suppose the natural parameter
-$\phi \sim \dbeta(1, 1)$ is uniformly distributed. Then the distribution
-of $\theta$ is
+where $\phi(\theta) := \log \frac{\theta}{1 - \theta}$, $u(y) := y$, $g(\theta) := (1 - \theta)^n$. Suppose the natural parameter $\phi \sim \dbeta(1, 1)$ is uniformly distributed. Then the distribution of $\theta$ is
 
 $$
 \begin{align}
@@ -101,16 +94,9 @@ $$
 \end{align}
 $$
 
-When $y = 0$, then the posterior distribution is
-$p(\theta \mid y = 0) \propto (1 - \theta)^{n - 1}\theta^{-1}$. When
-$y = n$, then the posterior distribution is
-$p(\theta \mid y = n) \propto \theta^{n-1}(1 - \theta)^{-1}$. These two
-cases are equivalent by the change of variable
-$\theta \mapsto 1 - \theta$.
+When $y = 0$, then the posterior distribution is $p(\theta \mid y = 0) \propto (1 - \theta)^{n - 1}\theta^{-1}$. When $y = n$, then the posterior distribution is $p(\theta \mid y = n) \propto \theta^{n-1}(1 - \theta)^{-1}$. These two cases are equivalent by the change of variable $\theta \mapsto 1 - \theta$. 
 
-We show that the distribution is improper for $y = 0$ by induction. The
-case $n = 0$ is shown above (for the prior). Assume the distribution is
-improper for any integer $k < n$. Then using integration by parts yields
+We show that the distribution is improper for $y = 0$ by induction. The case $n = 0$ is shown above (for the prior). Assume the distribution is improper for any integer $k < n$. Then using integration by parts yields
 
 $$
 \begin{align}
@@ -137,6 +123,4 @@ c
 \end{align}
 $$
 
-where $c < \infty$. By the induction hypothesis, the integral on the
-last line is $\infty$. Therefore, the distribution is also improper for
-$n$.
+where $c < \infty$.  By the induction hypothesis, the integral on the last line is $\infty$. Therefore, the distribution is also improper for $n$.

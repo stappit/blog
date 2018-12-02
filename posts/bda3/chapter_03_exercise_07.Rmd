@@ -3,6 +3,7 @@ title: "BDA3 Chapter 3 Exercise 7"
 author: "Brian Callander"
 date: "2018-10-21"
 tags: bda chapter 3, solutions, bayes, poisson, binomial, unsolved 
+tldr: Here's my solution to exercise 7, chapter 3, of Gelman's Bayesian Data Analysis (BDA), 3rd edition.
 always_allow_html: yes
 output: 
   md_document:

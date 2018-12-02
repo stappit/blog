@@ -3,6 +3,7 @@ title: "BDA3 Chapter 2 Exercise 15"
 author: "Brian Callander"
 date: '2018-09-04'
 tags: bda chapter 2, solutions, bayes, beta, mean, variance
+tldr: Here's my solution to exercise 15, chapter 2, of Gelman's Bayesian Data Analysis (BDA), 3rd edition.
 ---
 
 Here's my solution to exercise 15, chapter 2, of [Gelman's](https://andrewgelman.com/) *Bayesian Data Analysis* (BDA), 3rd edition. There are [solutions](http://www.stat.columbia.edu/~gelman/book/solutions.pdf) to some of the exercises on the [book's webpage](http://www.stat.columbia.edu/~gelman/book/).

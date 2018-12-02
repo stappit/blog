@@ -3,6 +3,7 @@ title: BDA3 Chapter 5 Exercise 2
 author: Brian Callander
 date: 2018-11-05
 tags: bda chapter 5, solutions, bayes, exchangeability
+tldr: Here's my solution to exercise 2, chapter 5, of Gelman's Bayesian Data Analysis (BDA), 3rd edition.
 always_allow_html: True
 output:
   md_document:

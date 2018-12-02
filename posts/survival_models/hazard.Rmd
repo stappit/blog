@@ -3,6 +3,7 @@ title: "Understanding the hazard function"
 author: "Brian Callander"
 date: "2018-08-05"
 tags: hazard, censoring, survival, exponential, poisson
+tldr: This post looks into the intuition behind the hazard function as used in survival analysis. We also show how to calculate the hazard of an exponential survival model using maximum likelihood estimation by considering the likelihood as a Poisson likelihood.
 always_allow_html: yes
 output: 
   md_document:

@@ -3,6 +3,7 @@ title: "Ageing and Marathon Running"
 author: "Brian"
 date: "2018-07-02"
 tags: running, marathon, berlin, gam, statistics, mgcv, random effects
+tldr: An analysis of 10 years of Berlin marathon data, by age, sex, and nationality. The fastest age for women tends to be younger than the fastest age for men. Running performance for 20 year olds tends to be similar to that of 50 year olds.
 always_allow_html: yes
 output: 
   md_document: 

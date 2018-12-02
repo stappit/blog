@@ -3,6 +3,7 @@ title: BDA3 Chapter 4 Exercise 1
 author: Brian Callander
 date: 2018-11-03
 tags: bda chapter 4, solutions, bayes, cauchy, normal approximation
+tldr: Here's my solution to exercise 1, chapter 4, of Gelman's Bayesian Data Analysis (BDA), 3rd edition.
 always_allow_html: True
 output:
   md_document:

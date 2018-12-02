@@ -1,61 +1,60 @@
 ---
-always_allow_html: True
-author: Brian Callander
-date: '2018-09-09'
-output:
+title: "BDA3 Chapter 2 Exercise 21"
+author: "Brian Callander"
+date: "2018-09-09"
+tags: bda chapter 2, solutions, bayes, poisson, gamma, exposure, election, usa, obama, pew research center
+tldr: Here's my solution to exercise 21, chapter 2, of Gelman's Bayesian Data Analysis (BDA), 3rd edition.
+always_allow_html: yes
+output: 
   md_document:
-    preserve_yaml: True
     variant: markdown
-tags: |
-    bda chapter 2, solutions, bayes, poisson, gamma, exposure, election,
-    usa, obama, pew research center
-title: BDA3 Chapter 2 Exercise 21
+    preserve_yaml: yes
 ---
 
-Here's my solution to exercise 21, chapter 2, of
-[Gelman's](https://andrewgelman.com/) *Bayesian Data Analysis* (BDA),
-3rd edition. There are
-[solutions](http://www.stat.columbia.edu/~gelman/book/solutions.pdf) to
-some of the exercises on the [book's
-webpage](http://www.stat.columbia.edu/~gelman/book/).
+Here's my solution to exercise 21, chapter 2, of [Gelman's](https://andrewgelman.com/) *Bayesian Data Analysis* (BDA), 3rd edition. There are [solutions](http://www.stat.columbia.edu/~gelman/book/solutions.pdf) to some of the exercises on the [book's webpage](http://www.stat.columbia.edu/~gelman/book/).
 
 <!--more-->
+
 <div style="display:none">
-
-$\DeclareMathOperator{\dbinomial}{Binomial}  \DeclareMathOperator{\dbern}{Bernoulli}  \DeclareMathOperator{\dpois}{Poisson}  \DeclareMathOperator{\dnorm}{Normal}  \DeclareMathOperator{\dcauchy}{Cauchy}  \DeclareMathOperator{\dexponential}{Exp}  \DeclareMathOperator{\dgamma}{Gamma}  \DeclareMathOperator{\dinvgamma}{InvGamma}  \DeclareMathOperator{\invlogit}{InvLogit}  \DeclareMathOperator{\logit}{Logit}  \DeclareMathOperator{\dbeta}{Beta}$
-
+  $\DeclareMathOperator{\dbinomial}{Binomial}
+   \DeclareMathOperator{\dbern}{Bernoulli}
+   \DeclareMathOperator{\dpois}{Poisson}
+   \DeclareMathOperator{\dnorm}{Normal}
+   \DeclareMathOperator{\dcauchy}{Cauchy}
+   \DeclareMathOperator{\dexponential}{Exp}
+   \DeclareMathOperator{\dgamma}{Gamma}
+   \DeclareMathOperator{\dinvgamma}{InvGamma}
+   \DeclareMathOperator{\invlogit}{InvLogit}
+   \DeclareMathOperator{\logit}{Logit}
+   \DeclareMathOperator{\dbeta}{Beta}$
 </div>
 
-I wasn't able to find any of the data for this question on the book's
-website (as indicated in the book). However, the data are available on
-the [Pew Research Center
-website](http://www.people-press.org/2008/11/02/november-2008-election-weekend-survey/).
-I am unsure if the Pew version is the same as the version intended in
-the book.
 
-Data inspection
----------------
+
+
+I wasn't able to find any of the data for this question on the book's website (as indicated in the book). However, the data are available on the [Pew Research Center website](http://www.people-press.org/2008/11/02/november-2008-election-weekend-survey/). I am unsure if the Pew version is the same as the version intended in the book.
+
+## Data inspection
 
 ### Loading
 
-Unzipping the download into my local `data` directory gives three files
-of interest:
+Unzipping the download into my local `data` directory gives three files of interest:
 
--   `ElectWkd08c.sav`
+* `ElectWkd08c.sav`  
 
     The dataset in SPSS format.
+    
+* `ElecWknd08.que.doc`  
 
--   `ElecWknd08.que.doc`
+    A description of the survey questions and their column names in the dataset.
+    
+* `readme.txt`
 
-    A description of the survey questions and their column names in the
-    dataset.
+    A description of the columns in the dataset derived from the survey questions.
+    
 
--   `readme.txt`
 
-    A description of the columns in the dataset derived from the survey
-    questions.
-
-``` {.r}
+```r
 library(foreign)
 
 df0 <- read.spss(file = 'data/ElectWkd08c.sav') %>% 
@@ -64,51 +63,55 @@ df0 <- read.spss(file = 'data/ElectWkd08c.sav') %>%
 df0 %>% nrow()
 ```
 
-    [1] 3402
+```
+[1] 3402
+```
 
 There are many columns.
 
-``` {.r}
+
+```r
 df0 %>% colnames()
 ```
 
-      [1] "psraid"    "attempt"   "fcall"     "refusal"   "int_date" 
-      [6] "area"      "scregion"  "sfips"     "sstate"    "cdist"    
-     [11] "msa"       "usr"       "usr1"      "sampzip"   "pdsgen"   
-     [16] "pdsrace"   "zfips"     "zstate"    "zcregion"  "zdensity3"
-     [21] "sdensity3" "file"      "sample"    "sex"       "qs1"      
-     [26] "thought"   "q1"        "voter"     "regist"    "regicert" 
-     [31] "planreg"   "precinct"  "q2"        "oftvote"   "where"    
-     [36] "horse"     "q3"        "q3_1"      "q3_2"      "q3_3"     
-     [41] "q3a"       "q3a_1"     "q3a_2"     "q3a_3"     "q3summ"   
-     [46] "q3summ2"   "q3tot"     "q3atot"    "q3horse"   "q3b"      
-     [51] "q3bfilt"   "q5"        "q6"        "swing"     "plan1"    
-     [56] "plan2"     "plan3"     "q7"        "q8"        "q9"       
-     [61] "q10a"      "q10b"      "q10c"      "q10d"      "q10e"     
-     [66] "q10f"      "q10g"      "q10de"     "q11"       "q12"      
-     [71] "q13"       "q14"       "q15"       "q15_1"     "q15_2"    
-     [76] "q15_3"     "Q15tot"    "q16"       "q16a"      "q17"      
-     [81] "age"       "recage"    "educ"      "receduc"   "hisp1"    
-     [86] "race_1"    "race_2"    "race_3"    "race_4"    "racecmb"  
-     [91] "racethn"   "marital"   "parent"    "relig"     "religos"  
-     [96] "chr"       "born"      "attend"    "income"    "party"    
-    [101] "partyln"   "ideo"      "class"     "employ"    "pvote04a" 
-    [106] "pvote04b"  "primary"   "first1"    "first2"    "scale10"  
-    [111] "labor"     "ql1"       "ql2"       "qc1"       "qc2"      
-    [116] "zipcode"   "money10"   "website"   "isex"      "ihisp1"   
-    [121] "irace_1"   "irace_2"   "irace_3"   "irace_4"   "iraceth"  
-    [126] "iracecmb"  "regfinal"  "ballot"    "mccain"    "obama"    
-    [131] "sameday"   "battle"    "phoneuse"  "filter_$"  "lvs"      
-    [136] "lvswt67"   "llweight"  "coweight"  "wt_weth"   "wt_thfr"  
-    [141] "wt_frsa"   "wt_wefr"   "weight"    "unlvwt67" 
+```
+  [1] "psraid"    "attempt"   "fcall"     "refusal"   "int_date" 
+  [6] "area"      "scregion"  "sfips"     "sstate"    "cdist"    
+ [11] "msa"       "usr"       "usr1"      "sampzip"   "pdsgen"   
+ [16] "pdsrace"   "zfips"     "zstate"    "zcregion"  "zdensity3"
+ [21] "sdensity3" "file"      "sample"    "sex"       "qs1"      
+ [26] "thought"   "q1"        "voter"     "regist"    "regicert" 
+ [31] "planreg"   "precinct"  "q2"        "oftvote"   "where"    
+ [36] "horse"     "q3"        "q3_1"      "q3_2"      "q3_3"     
+ [41] "q3a"       "q3a_1"     "q3a_2"     "q3a_3"     "q3summ"   
+ [46] "q3summ2"   "q3tot"     "q3atot"    "q3horse"   "q3b"      
+ [51] "q3bfilt"   "q5"        "q6"        "swing"     "plan1"    
+ [56] "plan2"     "plan3"     "q7"        "q8"        "q9"       
+ [61] "q10a"      "q10b"      "q10c"      "q10d"      "q10e"     
+ [66] "q10f"      "q10g"      "q10de"     "q11"       "q12"      
+ [71] "q13"       "q14"       "q15"       "q15_1"     "q15_2"    
+ [76] "q15_3"     "Q15tot"    "q16"       "q16a"      "q17"      
+ [81] "age"       "recage"    "educ"      "receduc"   "hisp1"    
+ [86] "race_1"    "race_2"    "race_3"    "race_4"    "racecmb"  
+ [91] "racethn"   "marital"   "parent"    "relig"     "religos"  
+ [96] "chr"       "born"      "attend"    "income"    "party"    
+[101] "partyln"   "ideo"      "class"     "employ"    "pvote04a" 
+[106] "pvote04b"  "primary"   "first1"    "first2"    "scale10"  
+[111] "labor"     "ql1"       "ql2"       "qc1"       "qc2"      
+[116] "zipcode"   "money10"   "website"   "isex"      "ihisp1"   
+[121] "irace_1"   "irace_2"   "irace_3"   "irace_4"   "iraceth"  
+[126] "iracecmb"  "regfinal"  "ballot"    "mccain"    "obama"    
+[131] "sameday"   "battle"    "phoneuse"  "filter_$"  "lvs"      
+[136] "lvswt67"   "llweight"  "coweight"  "wt_weth"   "wt_thfr"  
+[141] "wt_frsa"   "wt_wefr"   "weight"    "unlvwt67" 
+```
 
 ### State
 
-For each state, we want to know how many label themselves as
-`Very liberal` and how many report supporting Obama. The state is given
-by the `sstate` column and doesn't include Hawaii or Alaska.
+For each state, we want to know how many label themselves as `Very liberal` and how many report supporting Obama. The state is given by the `sstate` column and doesn't include Hawaii or Alaska.
 
-``` {.r}
+
+```r
 df0 %>% 
   group_by(sstate) %>% 
   count() %>% 
@@ -125,14 +128,14 @@ df0 %>%
   )
 ```
 
-![](chapter_02_exercise_21_files/figure-markdown/state_count-1..svg)
+![plot of chunk state_count](figure/state_count-1..svg)
 
 ### Ideology
 
-Consulting the documentation, we see that liberality is given by the
-`ideo` column.
+Consulting the documentation, we see that liberality is given by the `ideo` column.
 
-``` {.r}
+
+```r
 df0 %>% 
   ggplot() +
   aes(ideo) +
@@ -147,24 +150,22 @@ df0 %>%
   )
 ```
 
-![](chapter_02_exercise_21_files/figure-markdown/ideo_count-1..svg)
+![plot of chunk ideo_count](figure/ideo_count-1..svg)
+
 
 ### Obama voters
 
-The data indicating vote is not so obvious. There is
+The data indicating vote is not so obvious. There is 
 
--   current voting preference in question 3, of which there are
-    different versions for different states;
--   there are various columns derived from the survey responses to
-    question 3, such as `q3horse`;
--   there is question 6 which asks for voting intention in November; and
--   there is a column called `obama` for which I couldn't find any
-    documentation.
+* current voting preference in question 3, of which there are different versions for different states;
+* there are various columns derived from the survey responses to question 3, such as `q3horse`;
+* there is question 6 which asks for voting intention in November; and
+* there is a column called `obama` for which I couldn't find any documentation.
 
-Despite the lack of documentation, I'll run with `obama` since the
-responses seem to align better with the purpose of the exercise.
+Despite the lack of documentation, I'll run with `obama` since the responses seem to align better with the purpose of the exercise. 
 
-``` {.r}
+
+```r
 df0 %>% 
   ggplot() +
   aes(obama) +
@@ -179,14 +180,14 @@ df0 %>%
   )
 ```
 
-![](chapter_02_exercise_21_files/figure-markdown/vote_count-1..svg)
+![plot of chunk vote_count](figure/vote_count-1..svg)
 
 ### Data augmentation
 
-In order to display two-letter abbreviations of the states, we use the
-data provided by the `state` package and join it to the Pew dataset.
+In order to display two-letter abbreviations of the states, we use the data provided by the `state` package and join it to the Pew dataset.
 
-``` {.r}
+
+```r
 mapping <- tibble(
   name = as_factor(state.name, levels = levels(df$sstate)), 
   abbreviation = state.abb
@@ -197,81 +198,51 @@ df <- df0 %>%
 ```
 
 Here's a sample from the mapping table.
-
+  
 <table class="table table-striped table-hover table-condensed table-responsive" style="margin-left: auto; margin-right: auto;">
-<thead>
-<tr>
-<th style="text-align:left;">
-name
-</th>
-<th style="text-align:left;">
-abbreviation
-</th>
-</tr>
-</thead>
+ <thead>
+  <tr>
+   <th style="text-align:left;"> name </th>
+   <th style="text-align:left;"> abbreviation </th>
+  </tr>
+ </thead>
 <tbody>
-<tr>
-<td style="text-align:left;">
-Alabama
-</td>
-<td style="text-align:left;">
-AL
-</td>
-</tr>
-<tr>
-<td style="text-align:left;">
-Alaska
-</td>
-<td style="text-align:left;">
-AK
-</td>
-</tr>
-<tr>
-<td style="text-align:left;">
-Arizona
-</td>
-<td style="text-align:left;">
-AZ
-</td>
-</tr>
-<tr>
-<td style="text-align:left;">
-Arkansas
-</td>
-<td style="text-align:left;">
-AR
-</td>
-</tr>
-<tr>
-<td style="text-align:left;">
-California
-</td>
-<td style="text-align:left;">
-CA
-</td>
-</tr>
-<tr>
-<td style="text-align:left;">
-Colorado
-</td>
-<td style="text-align:left;">
-CO
-</td>
-</tr>
+  <tr>
+   <td style="text-align:left;"> Alabama </td>
+   <td style="text-align:left;"> AL </td>
+  </tr>
+  <tr>
+   <td style="text-align:left;"> Alaska </td>
+   <td style="text-align:left;"> AK </td>
+  </tr>
+  <tr>
+   <td style="text-align:left;"> Arizona </td>
+   <td style="text-align:left;"> AZ </td>
+  </tr>
+  <tr>
+   <td style="text-align:left;"> Arkansas </td>
+   <td style="text-align:left;"> AR </td>
+  </tr>
+  <tr>
+   <td style="text-align:left;"> California </td>
+   <td style="text-align:left;"> CA </td>
+  </tr>
+  <tr>
+   <td style="text-align:left;"> Colorado </td>
+   <td style="text-align:left;"> CO </td>
+  </tr>
 </tbody>
 </table>
-Ideology vs. Obama voter
-------------------------
+
+
+## Ideology vs. Obama voter
 
 ### Raw proportions
 
-Let's take a look at how the proportion of liberals relates to the
-proportion of Obama voters. There seems to be a positive relation,
-although the data are fairly noisy. Plotting the full range of values on
-the y-axis makes the noise more prominent. We only show the resticted
-range in order to show the individual state names.
+Let's take a look at how the proportion of liberals relates to the proportion of Obama voters. There seems to be a positive relation, although the data are fairly noisy. Plotting the full range of values on the y-axis makes the noise more prominent. We only show the resticted range in order to show the individual state names.
 
-``` {.r}
+
+```r
 qa <- df %>% 
   group_by(sstate) %>% 
   summarise(
@@ -299,26 +270,26 @@ qa %>%
   )
 ```
 
-![](chapter_02_exercise_21_files/figure-markdown/state_liberal_vs_obama-1..svg)
+![plot of chunk state_liberal_vs_obama](figure/state_liberal_vs_obama-1..svg)
 
 ### Posterior inference
 
-We'll base our prior on the data (for convenience) and don't take survey
-non-response issues into account. The pooled mean proportion of liberals
-will be our prior mean.
+We'll base our prior on the data (for convenience) and don't take survey non-response issues into account. The pooled mean proportion of liberals will be our prior mean.
 
-``` {.r}
+
+```r
 mu <- sum(df$ideo == 'Very liberal', na.rm = TRUE) / nrow(df)
 percent(mu)
 ```
 
-    [1] "3.5%"
+```
+[1] "3.5%"
+```
 
-After trying various possibilities for the standard deviation `sigma`,
-the value below results in a prior that puts most of the density between
-0% and 18%.
+After trying various possibilities for the standard deviation `sigma`, the value below results in a prior that puts most of the density between 0% and 18%.
 
-``` {.r}
+
+```r
 sigma <- 0.04
 
 shape <- (mu / sigma)^2
@@ -342,13 +313,12 @@ tibble(
   )
 ```
 
-![](chapter_02_exercise_21_files/figure-markdown/prior-1..svg)
+![plot of chunk prior](figure/prior-1..svg)
 
-Let's add the posterior means to our dataset and plot the them against
-proportion of Obama voters. In order to be visually comparable to the
-plot of observed data, we keep the limits of the axes the same.
+Let's add the posterior means to our dataset and plot the them against proportion of Obama voters. In order to be visually comparable to the plot of observed data, we keep the limits of the axes the same.
 
-``` {.r}
+
+```r
 qa_posterior <- qa %>% 
   mutate(
     posterior_shape = shape + liberals,
@@ -370,14 +340,12 @@ qa_posterior %>%
   )
 ```
 
-![](chapter_02_exercise_21_files/figure-markdown/posterior-1..svg)
+![plot of chunk posterior](figure/posterior-1..svg)
 
-The posterior 95% credible intervals are shown below. Arizona and
-Louisianna seem to have a smaller proportional of liberals compared to
-the country average. Only Oregon's credible interval is entirely above
-the country average.
+The posterior 95% credible intervals are shown below. Arizona and Louisianna seem to have a smaller proportional of liberals compared to the country average. Only Oregon's credible interval is entirely above the country average.
 
-``` {.r}
+
+```r
 qa_posterior %>% 
   mutate(
     ci = map2(
@@ -406,15 +374,12 @@ qa_posterior %>%
   )
 ```
 
-![](chapter_02_exercise_21_files/figure-markdown/ci-1..svg)
+![plot of chunk ci](figure/ci-1..svg)
 
-All of the states in which no liberals were observed had smaller sample
-sizes (below 50). The largest proportions were also observed in the
-states with sample sizes below 50. This plot looks fairly similar to the
-analogous plot for the cancer rate example, albeit with fewer data
-points.
+All of the states in which no liberals were observed had smaller sample sizes (below 50). The largest proportions were also observed in the states with sample sizes below 50. This plot looks fairly similar to the analogous plot for the cancer rate example, albeit with fewer data points.
 
-``` {.r}
+
+```r
 qa %>% 
   ggplot() +
   aes(respondents, liberal_proportion) +
@@ -428,12 +393,12 @@ qa %>%
   )
 ```
 
-![](chapter_02_exercise_21_files/figure-markdown/observed_prop_vs_num_respondents-1..svg)
+![plot of chunk observed_prop_vs_num_respondents](figure/observed_prop_vs_num_respondents-1..svg)
 
-The posterior estimates result in much less extreme values for the
-states with few respondents.
+The posterior estimates result in much less extreme values for the states with few respondents.
 
-``` {.r}
+
+```r
 qa_posterior %>% 
   ggplot() +
   aes(respondents, posterior_mean) +
@@ -447,4 +412,4 @@ qa_posterior %>%
   )
 ```
 
-![](chapter_02_exercise_21_files/figure-markdown/posterior_prop_vs_num_respondents-1..svg)
+![plot of chunk posterior_prop_vs_num_respondents](figure/posterior_prop_vs_num_respondents-1..svg)

@@ -1,34 +1,40 @@
 ---
-always_allow_html: True
-output:
+title: "BDA3 Chapter 5 Exercise 8"
+author: "Brian Callander"
+date: "2018-12-01"
+tags: bda chapter 5, solutions, bayes, mixture, conjugate prior
+tldr: Here's my solution to exercise 8, chapter 5, of Gelman's Bayesian Data Analysis (BDA), 3rd edition.
+always_allow_html: yes
+output: 
   md_document:
-    preserve_yaml: True
     variant: markdown
-tags: 'bda chapter 5, solutions, bayes, mixture, conjugate prior'
-title: BDA3 Chapter 5 Exercise 8
-date: 2018-12-01
-tldr: Here's my solution to exercise 8, chapter 5, of Gelman's Bayesian Data Analysis (BDA) 3rd edition. 
+    preserve_yaml: yes
 ---
 
-Here's my solution to exercise 8, chapter 5, of
-[Gelman's](https://andrewgelman.com/) *Bayesian Data Analysis* (BDA),
-3rd edition. There are
-[solutions](http://www.stat.columbia.edu/~gelman/book/solutions.pdf) to
-some of the exercises on the [book's
-webpage](http://www.stat.columbia.edu/~gelman/book/).
+Here's my solution to exercise 8, chapter 5, of [Gelman's](https://andrewgelman.com/) *Bayesian Data Analysis* (BDA), 3rd edition. There are [solutions](http://www.stat.columbia.edu/~gelman/book/solutions.pdf) to some of the exercises on the [book's webpage](http://www.stat.columbia.edu/~gelman/book/).
 
 <!--more-->
+
 <div style="display:none">
-
-$\DeclareMathOperator{\dbinomial}{Binomial}  \DeclareMathOperator{\dbern}{Bernoulli}  \DeclareMathOperator{\dpois}{Poisson}  \DeclareMathOperator{\dnorm}{Normal}  \DeclareMathOperator{\dt}{t}  \DeclareMathOperator{\dcauchy}{Cauchy}  \DeclareMathOperator{\dexponential}{Exp}  \DeclareMathOperator{\duniform}{Uniform}  \DeclareMathOperator{\dgamma}{Gamma}  \DeclareMathOperator{\dinvgamma}{InvGamma}  \DeclareMathOperator{\invlogit}{InvLogit}  \DeclareMathOperator{\logit}{Logit}  \DeclareMathOperator{\ddirichlet}{Dirichlet}  \DeclareMathOperator{\dbeta}{Beta}$
-
+  $\DeclareMathOperator{\dbinomial}{Binomial}
+   \DeclareMathOperator{\dbern}{Bernoulli}
+   \DeclareMathOperator{\dpois}{Poisson}
+   \DeclareMathOperator{\dnorm}{Normal}
+   \DeclareMathOperator{\dt}{t}
+   \DeclareMathOperator{\dcauchy}{Cauchy}
+   \DeclareMathOperator{\dexponential}{Exp}
+   \DeclareMathOperator{\duniform}{Uniform}
+   \DeclareMathOperator{\dgamma}{Gamma}
+   \DeclareMathOperator{\dinvgamma}{InvGamma}
+   \DeclareMathOperator{\invlogit}{InvLogit}
+   \DeclareMathOperator{\logit}{Logit}
+   \DeclareMathOperator{\ddirichlet}{Dirichlet}
+   \DeclareMathOperator{\dbeta}{Beta}$
 </div>
 
-Let $p_m(\theta)$, $m = 1, \dotsc, M$, be conjugate prior densities for
-the likelihood $y \mid \theta$, and $\lambda_m \in [0, 1]$ such that
-$\sum_1^M \lambda_m = 1$. We show that
-$p(\theta) := \sum_{m = 1}^M \lambda_m p_m(\theta)$ is also a conjugate
-prior. This follows from the calculation of the posterior:
+
+
+Let $p_m(\theta)$, $m = 1, \dotsc, M$, be conjugate prior densities for the likelihood $y \mid \theta$, and $\lambda_m \in [0, 1]$ such that $\sum_1^M \lambda_m = 1$. We show that $p(\theta) := \sum_{m = 1}^M \lambda_m p_m(\theta)$ is also a conjugate prior. This follows from the calculation of the posterior:
 
 $$
 \begin{align}
@@ -51,18 +57,12 @@ $$
 \end{align}
 $$
 
-where $\lambda_m' := \lambda_m p_m (y)$. Since each term
-$p_m(\theta \mid y)$ has the same parametric form as $p_m(\theta)$, the
-posterior has the same parametric form as the prior,
-$\sum_1^M \lambda_m p_m(\theta)$.
+where $\lambda_m' := \lambda_m p_m (y)$. Since each term $p_m(\theta \mid y)$ has the same parametric form as $p_m(\theta)$, the posterior has the same parametric form as the prior, $\sum_1^M \lambda_m p_m(\theta)$.
 
-To apply this to a concrete example, suppose
-$y \mid \theta \sim \dnorm(\theta, 1)$, where $\theta$ is mostl likely
-near $1$ with standard deviation of 0.5 but has some probability of
-being near -1, still with standard deviation 0.5. Let's calculate the
-posterior after 10 observations with mean -0.25.
+To apply this to a concrete example, suppose $y \mid \theta \sim \dnorm(\theta, 1)$, where $\theta$ is mostl likely near $1$ with standard deviation of 0.5 but has some probability of being near -1, still with standard deviation 0.5. Let's calculate the posterior after 10 observations with mean -0.25.
 
-``` {.r}
+
+```r
 mu_pos <- 1
 sd_pos <- 0.5
 lambda_pos <- 0.9
@@ -79,10 +79,10 @@ prior <- tibble(
 )
 ```
 
-![](chapter_05_exercise_08_files/figure-markdown/prior_plot-1..svg)
+![plot of chunk prior_plot](figure/prior_plot-1..svg)
 
-The posterior for each mixture component can be calculated using
-equation 2.12 (page 42). In particular,
+
+The posterior for each mixture component can be calculated using equation 2.12 (page 42). In particular,
 
 $$
 \begin{align}
@@ -91,9 +91,10 @@ $$
 \end{align}
 $$
 
-where
+where 
 
-``` {.r}
+
+```r
 n <- 10
 ybar <- -0.25
 
@@ -106,13 +107,12 @@ sd_10_neg <- 1 / sqrt(1 / sd_neg^2 + n / sigma^2)
 mu_10_neg <- (mu_neg / sd_neg^2 + n * ybar / sigma^2) / (1 / sd_10_neg^2)
 ```
 
-This gives us positive and negative means of 0.107, -0.464,
-respectively, and stanard deviations both equal to 0.267.
+This gives us positive and negative means of 0.107, -0.464, respectively, and stanard deviations both equal to 0.267.
 
-In order to find the full posterior distribution, we also need the
-posterior mixture proportions. These are given by
+In order to find the full posterior distribution, we also need the posterior mixture proportions. These are given by
 
-``` {.r}
+
+```r
 py_pos <- dnorm(ybar, mu_pos, sqrt(sd_pos^2 + sigma^2 / n))
 lambda_prime_pos0 <- lambda_pos * py_pos
 
@@ -126,10 +126,10 @@ lambda_prime_neg <- lambda_prime_neg0 / normaliser
 
 This gives positive and negative weights of 68.3%, 31.7%, respectively.
 
-We'll calculate the normalised posterior density on a grid between \[-3,
-3\].
+We'll calculate the normalised posterior density on a grid between [-3, 3].
 
-``` {.r}
+
+```r
 granularity <- 0.01
 
 posterior <- tibble(
@@ -141,7 +141,6 @@ posterior <- tibble(
 ) 
 ```
 
-![](chapter_05_exercise_08_files/figure-markdown/posterior_plot-1..svg)
+![plot of chunk posterior_plot](figure/posterior_plot-1..svg)
 
-This posterior looks like a 'hunchback normal' distribution, with the
-two modes being much less distinct.
+This posterior looks like a 'hunchback normal' distribution, with the two modes being much less distinct.

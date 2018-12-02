@@ -3,6 +3,7 @@ title: "BDA3 Chapter 3 Exercise 2"
 author: "Brian Callander"
 date: "2018-09-15"
 tags: bda chapter 3, solutions, bayes, multinomial, dirichlet, beta
+tldr: Here's my solution to exercise 2, chapter 3, of Gelman's Bayesian Data Analysis (BDA), 3rd edition.
 always_allow_html: yes
 output: 
   md_document:

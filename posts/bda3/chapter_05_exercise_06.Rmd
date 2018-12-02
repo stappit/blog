@@ -3,6 +3,7 @@ title: "BDA3 Chapter 5 Exercise 6"
 author: "Brian Callander"
 date: "2018-11-11"
 tags: bda chapter 5, solutions, bayes, mixture, exchangeability, divorce rates
+tldr: Here's my solution to exercise 6, chapter 5, of Gelman's Bayesian Data Analysis (BDA), 3rd edition.
 always_allow_html: yes
 output: 
   md_document:

@@ -3,6 +3,7 @@ title: "BDA3 Chapter 3 Exercise 8"
 author: "Brian Callander"
 date: "2018-10-21"
 tags: bda chapter 3, solutions, bayes, poisson
+tldr: Here's my solution to exercise 8, chapter 3, of Gelman's Bayesian Data Analysis (BDA), 3rd edition.
 always_allow_html: yes
 output: 
   md_document:

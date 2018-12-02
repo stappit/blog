@@ -7,6 +7,7 @@ output:
     preserve_yaml: True
     variant: markdown
 tags: bda chapter 3, solutions, bayes, conjugate prior, normal, inverse chi2, normal inverse chi2
+tldr: Here's my solution to exercise 9, chapter 3, of Gelman's Bayesian Data Analysis (BDA), 3rd edition.
 title: BDA3 Chapter 3 Exercise 9
 ---
 

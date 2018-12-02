@@ -3,6 +3,7 @@ title: "Counting cylists in Berlin"
 author: "Brian Callander"
 date: "2018-11-29"
 tags: berlin, cycling, open data, eda, timeseries, excel
+tldr: This is an exploratory data analysis of Berlin open data on bike counters around the city. There are strong commuter effects at hour of the day, also when looking at the differences of paired counters. There is yearly seasonality, with a peak in the summer and trough in the winter. There is no obvious change in traffic over the years.
 always_allow_html: yes
 output: 
   md_document:

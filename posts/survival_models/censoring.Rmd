@@ -3,6 +3,7 @@ title: "How to deal with right-censored observations"
 author: "Brian Callander"
 date: "2018-08-04"
 tags: censoring, stan, likelihood, survival, mle, poisson
+tldr: Take a close look at how to account for right-censoring in simple survival models. We examine the likelihood function and implement a model in Stan.
 always_allow_html: yes
 output: 
   md_document:

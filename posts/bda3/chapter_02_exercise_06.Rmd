@@ -3,6 +3,7 @@ title: "BDA3 Chapter 2 Exercise 6"
 author: "Brian Callander"
 date: "2018-08-25"
 tags: bda chapter 2, bda, solutions, bayes, poisson, gamma, negative binomial
+tldr: Here's my solution to exercise 6, chapter 2, of Gelman's Bayesian Data Analysis (BDA), 3rd edition.
 always_allow_html: yes
 output: 
   md_document:

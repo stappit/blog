@@ -2,6 +2,7 @@
 title: BDA3 Chapter 5 Exercise 5
 author: Brian Callander
 tags: bda chapter 5, solutions, bayes, de finetti, exchangeability, covariance
+tldr: Here's my solution to exercise 5, chapter 5, of Gelman's Bayesian Data Analysis (BDA), 3rd edition.
 date: 2018-11-10
 always_allow_html: True
 output:

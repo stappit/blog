@@ -3,6 +3,7 @@ title: BDA3 Chapter 3 Exercise 10
 author: Brian Callander
 date: 2018-10-21
 tags: bda chapter 3, solutions, bayes, f, scaled inverse chi2, inverse chi2, chi2
+tldr: Here's my solution to exercise 10, chapter 3, of Gelman's Bayesian Data Analysis (BDA), 3rd edition.
 always_allow_html: True
 output:
   md_document:

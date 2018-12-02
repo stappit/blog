@@ -3,6 +3,7 @@ title: "BDA3 Chapter 5 Exercise 7"
 author: "Brian Callander"
 date: "2018-12-01"
 tags: bda chapter 5, solutions, bayes, law of total expectation, law of total variance
+tldr: Here's my solution to exercise 7, chapter 5, of Gelman's Bayesian Data Analysis (BDA), 3rd edition.
 always_allow_html: yes
 output: 
   md_document:

@@ -3,6 +3,7 @@ title: "BDA3 Chapter 5 Exercise 3"
 author: "Brian Callander"
 date: "2018-11-10"
 tags: bda chapter 5, solutions, bayes, hierarchical model, eight schools, pooling
+tldr: Here's my solution to exercise 3, chapter 5, of Gelman's Bayesian Data Analysis (BDA), 3rd edition.
 always_allow_html: yes
 output: 
   md_document:

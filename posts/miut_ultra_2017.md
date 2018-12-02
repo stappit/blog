@@ -2,7 +2,8 @@
 title: MIUT Ultra 2017 Race Report
 author: Brian
 date: 2017-04-25
-tags: running, trail running, miut, ultra
+tags: running, trail running, miut, ultra, race report
+tldr: My race report for the MIUT 75km ultra, 2017.
 ---
 
 This is my race report for the [MIUT ultra](http://www.madeiraultratrail.com/en/the-event/ultra-course), 2017.

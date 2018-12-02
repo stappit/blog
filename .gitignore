@@ -27,6 +27,11 @@ cabal.sandbox.config
 site
 _site
 _cache
+
+#########
+# DATA
+# #######
+
 *.csv
 *.xlsx
 *.xls

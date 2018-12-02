@@ -1,36 +1,36 @@
 ---
-always_allow_html: True
-author: Brian Callander
-date: '2018-09-01'
-output:
+title: "BDA3 Chapter 2 Exercise 10"
+author: "Brian Callander"
+date: "2018-09-01"
+tags: bda chapter 2, solutions, bayes, geometric, noninformative prior, jeffrey prior
+tldr: Here's my solution to exercise 10, chapter 2, of Gelman's Bayesian Data Analysis (BDA), 3rd edition.
+always_allow_html: yes
+output: 
   md_document:
-    preserve_yaml: True
     variant: markdown
-tags: |
-    bda chapter 2, solutions, bayes, geometric, noninformative prior,
-    jeffrey prior
-title: BDA3 Chapter 2 Exercise 10
+    preserve_yaml: yes
 ---
 
-Here's my solution to exercise 10, chapter 2, of
-[Gelman's](https://andrewgelman.com/) *Bayesian Data Analysis* (BDA),
-3rd edition. There are
-[solutions](http://www.stat.columbia.edu/~gelman/book/solutions.pdf) to
-some of the exercises on the [book's
-webpage](http://www.stat.columbia.edu/~gelman/book/).
+Here's my solution to exercise 10, chapter 2, of [Gelman's](https://andrewgelman.com/) *Bayesian Data Analysis* (BDA), 3rd edition. There are [solutions](http://www.stat.columbia.edu/~gelman/book/solutions.pdf) to some of the exercises on the [book's webpage](http://www.stat.columbia.edu/~gelman/book/).
 
 <!--more-->
+
 <div style="display:none">
-
-$\DeclareMathOperator{\dbinomial}{binomial}  \DeclareMathOperator{\dbern}{Bernoulli}  \DeclareMathOperator{\dnorm}{normal}  \DeclareMathOperator{\dgamma}{gamma}  \DeclareMathOperator{\invlogit}{invlogit}  \DeclareMathOperator{\logit}{logit}  \DeclareMathOperator{\dbeta}{beta}$
-
+  $\DeclareMathOperator{\dbinomial}{binomial}
+   \DeclareMathOperator{\dbern}{Bernoulli}
+   \DeclareMathOperator{\dnorm}{normal}
+   \DeclareMathOperator{\dgamma}{gamma}
+   \DeclareMathOperator{\invlogit}{invlogit}
+   \DeclareMathOperator{\logit}{logit}
+   \DeclareMathOperator{\dbeta}{beta}$
 </div>
 
-The posterior density
----------------------
 
-There an N cars labelled 1 to N and we observe a random car labelled
-203. With a geometric prior with mean 100, the unnormalised posterior is
+
+
+## The posterior density
+
+There an N cars labelled 1 to N and we observe a random car labelled 203. With a geometric prior with mean 100, the unnormalised posterior is
 
 $$
 p(N \mid y = 203)
@@ -50,10 +50,7 @@ p(y = 203 \mid N) \cdot p (N)
 \right\}
 $$
 
-We find the normalising constant in two steps. First set
-$x := \frac{99}{100}$ and use the [Taylor
-series](https://en.wikipedia.org/wiki/Taylor_series#Natural_logarithm)
-of $\log(1 - x)$ to show
+We find the normalising constant in two steps. First set $x := \frac{99}{100}$ and use the [Taylor series](https://en.wikipedia.org/wiki/Taylor_series#Natural_logarithm) of $\log(1 - x)$ to show 
 
 $$
 \begin{align}
@@ -85,7 +82,8 @@ $$
 
 which we approximate with the following computation.
 
-``` {.r}
+
+```r
 # value of the Nth term in the sum
 term <- function(N) 
   (1 / N) * (1 / 100) * (99 / 100)^(N - 1) 
@@ -103,12 +101,14 @@ c <- c0 - c1
 c
 ```
 
-    [1] 0.0004705084
+```
+[1] 0.0004705084
+```
 
-The posterior moments
----------------------
 
-The posterior mean is
+## The posterior moments
+
+The posterior mean is 
 
 $$
 \begin{align}
@@ -134,14 +134,17 @@ $$
 ,
 $$
 
-which is approximately
+which is approximately 
 
-``` {.r}
+
+```r
 mu <- (1 / c) * (99 / 100)^202
 mu
 ```
 
-    [1] 279.0885
+```
+[1] 279.0885
+```
 
 This is larger than the prior mean of 100.
 
@@ -170,7 +173,8 @@ $$
 
 which we approximate with the following code.
 
-``` {.r}
+
+```r
 EN2_left <- 100 / c
 
 EN2_right <- 1:201 %>% 
@@ -183,38 +187,41 @@ EN2 <- EN2_left - EN2_right
 EN2
 ```
 
-    [1] 84854.18
+```
+[1] 84854.18
+```
 
-It follows that the posterior variance and standard deviation is
-approximately
+It follows that the posterior variance and standard deviation is approximately 
 
-``` {.r}
+
+```r
 v <- EN2 - mu^2
 sigma <- sqrt(v)
 c(v, sigma)
 ```
 
-    [1] 6963.78665   83.44931
+```
+[1] 6963.78665   83.44931
+```
 
-These are smaller than the prior variance and standard deviation,
-respectively:
+These are smaller than the prior variance and standard deviation, respectively:
 
-``` {.r}
+
+```r
 v_prior <- (99 / 100) / (0.01^2)
 sigma_prior <- sqrt(v_prior)
 c(v_prior, sigma_prior)
 ```
 
-    [1] 9900.00000   99.49874
+```
+[1] 9900.00000   99.49874
+```
 
-A non-informative prior
------------------------
+## A non-informative prior
 
-There is no proper uniform density over the positive integers. A uniform
-prior also leaves us with an improper posterior.
+There is no proper uniform density over the positive integers. A uniform prior also leaves us with an improper posterior. 
 
-Jeffrey's prior is $p(N) \propto \frac{1}{N}$, which is also improper.
-However, it yields the following (unnormalised) posterior
+Jeffrey's prior is $p(N) \propto \frac{1}{N}$, which is also improper. However, it yields the following (unnormalised) posterior
 
 $$
 p(N \mid y = 203)
@@ -234,8 +241,7 @@ $$
 
 which is proper.
 
-Using the [Basel problem](https://en.wikipedia.org/wiki/Basel_problem)
-we can calculate the normalising constant
+Using the [Basel problem](https://en.wikipedia.org/wiki/Basel_problem) we can calculate the normalising constant
 
 $$
 c
@@ -251,7 +257,8 @@ $$
 
 which is approximately
 
-``` {.r}
+
+```r
 c_left <- pi^2 / 6
 
 c_right <- 1:202 %>% 
@@ -263,7 +270,10 @@ c <- c_left - c_right
 c
 ```
 
-    [1] 0.004938262
+```
+[1] 0.004938262
+```
+
 
 The posterior mean is not well-defined since
 

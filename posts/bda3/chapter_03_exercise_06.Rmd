@@ -3,6 +3,7 @@ title: "BDA3 Chapter 3 Exercise 6"
 author: "Brian Callander"
 date: "2018-10-07"
 tags: bda chapter 3, solutions, bayes, hierarchical, grid approximation, binomial, log-factorial, stirling's approximation
+tldr: Here's my solution to exercise 6, chapter 3, of Gelman's Bayesian Data Analysis (BDA), 3rd edition.
 always_allow_html: yes
 output: 
   md_document:

@@ -3,6 +3,7 @@ title: "BDA3 Chapter 2 Exercise 2"
 author: "Brian Callander"
 date: "2018-08-21"
 tags: stan, binomial, bayes, solutions, bda chapter 2, bda
+tldr: Here's my solution to exercise 2, chapter 2, of Gelman's Bayesian Data Analysis (BDA), 3rd edition.
 always_allow_html: yes
 output: 
   md_document:

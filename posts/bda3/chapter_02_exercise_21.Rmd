@@ -3,6 +3,7 @@ title: "BDA3 Chapter 2 Exercise 21"
 author: "Brian Callander"
 date: "2018-09-09"
 tags: bda chapter 2, solutions, bayes, poisson, gamma, exposure, election, usa, obama, pew research center
+tldr: Here's my solution to exercise 21, chapter 2, of Gelman's Bayesian Data Analysis (BDA), 3rd edition.
 always_allow_html: yes
 output: 
   md_document:

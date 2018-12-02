@@ -1,6 +1,7 @@
 ---
 always_allow_html: True
 author: Brian Callander
+tldr: Here's my solution to exercise 20, chapter 2, of Gelman's Bayesian Data Analysis (BDA), 3rd edition.
 date: '2018-09-08'
 output:
   md_document:

@@ -3,6 +3,7 @@ title: Okasaki's PFDS, Chapter 6
 author: Brian
 date: 2015-12-05
 tags: fp, haskell, okasaki, execution trace, queue, merge sort, sortable
+tldr: These are my solutions to chapter 6 of Okasaki's Purely functional Data Structures.
 ---
 
 This post contains my solutions to the exercises in chapter 6 of Okasaki's "Purely Functional Data Structures".
