@@ -1,6 +1,7 @@
 --------------------------------------------------------------------------------
 {-# LANGUAGE OverloadedStrings #-}
 import           Data.Monoid (mappend, mconcat, (<>))
+import           Data.Maybe (fromMaybe)
 import           Hakyll
 import           Text.Pandoc (WriterOptions (..), HTMLMathMethod (MathJax))
 import           Text.Pandoc.Options
@@ -55,7 +56,7 @@ main = hakyll $ do
                         `mappend` listField "posts" postCtx (return posts) 
                         `mappend` defaultContext 
             makeItem "" 
-                    >>= loadAndApplyTemplate "templates/tag.html" ctx 
+                >>= loadAndApplyTemplate "templates/tag.html" ctx 
                 >>= loadAndApplyTemplate "templates/default.html" ctx 
                 >>= relativizeUrls
 
@@ -66,7 +67,7 @@ main = hakyll $ do
             >>= loadAndApplyTemplate "templates/post.html"    (postCtxWithTags tags categories)
             >>= applyFilter postFilters
             >>= saveSnapshot "content"
-            >>= loadAndApplyTemplate "templates/default.html" (postCtxWithTags tags categories)
+            >>= loadAndApplyTemplate "templates/default.html" (postCtxWithTags tags categories <> metaKeywordContext <> metaDescriptionContext)
             >>= relativizeUrls
 
     {-match "drafts/*" $ do-}
@@ -146,7 +147,7 @@ postsGlob = "posts/**.md" :: Pattern
 
 postCtx :: Context String
 postCtx = mconcat
-    [ dateField "date" "%B %e, %Y"
+    [ dateField "date" "%e %B, %Y"
     , constField "author" "Brian"
     , defaultContext
     ]
@@ -203,6 +204,25 @@ postFilters = mathjaxFix
 mathjaxFix = replaceAll "><span class=\"math" (" class=\"mathjaxWide\"" ++)
 
 noAtxLhs = replaceAll "^#" (" "++)
+
+metaKeywordContext :: Context String
+-- can be reached using $metaKeywords$ in the templates
+-- Use the current item (markdown file)
+metaKeywordContext = field "keywords" $ \item -> do
+  -- tags contains the content of the "tags" metadata
+  -- inside the item (understand the source)
+  tags <- getMetadataField (itemIdentifier item) "tags"
+  return $ fromMaybe "" tags
+
+metaDescriptionContext :: Context String
+-- can be reached using $metaKeywords$ in the templates
+-- Use the current item (markdown file)
+metaDescriptionContext = field "tldr" $ \item -> do
+  -- tags contains the content of the "tags" metadata
+  -- inside the item (understand the source)
+  tldr <- getMetadataField (itemIdentifier item) "tldr"
+  return $ fromMaybe "" tldr
+
 ----------------------------------------------------------------------------------
 myFeedConfiguration :: FeedConfiguration
 myFeedConfiguration = FeedConfiguration

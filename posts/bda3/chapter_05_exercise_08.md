@@ -1,13 +1,13 @@
 ---
 always_allow_html: True
-author: Brian Callander
-date: '2018-12-01'
 output:
   md_document:
     preserve_yaml: True
     variant: markdown
 tags: 'bda chapter 5, solutions, bayes, mixture, conjugate prior'
 title: BDA3 Chapter 5 Exercise 8
+date: 2018-12-01
+tldr: Here's my solution to exercise 8, chapter 5, of Gelman's Bayesian Data Analysis (BDA) 3rd edition. 
 ---
 
 Here's my solution to exercise 8, chapter 5, of
