@@ -1,43 +1,42 @@
 ---
-title: "BDA3 Chapter 3 Exercise 3"
-author: "Brian Callander"
-date: "2018-10-04"
-tags: bda chapter 3, solutions, bayes, normal, t, behrens-fischer, marginal posterior
-tldr: Here's my solution to exercise 3, chapter 3, of Gelman's Bayesian Data Analysis (BDA), 3rd edition.
-always_allow_html: yes
-output: 
+always_allow_html: True
+author: Brian Callander
+date: '2018-10-04'
+output:
   md_document:
+    preserve_yaml: True
     variant: markdown
-    preserve_yaml: yes
+tags: |
+    bda chapter 3, solutions, bayes, normal, t, behrens-fischer, marginal
+    posterior
+title: BDA3 Chapter 3 Exercise 3
+tldr: |
+    Here's my solution to exercise 3, chapter 3, of Gelman's Bayesian Data
+    Analysis (BDA), 3rd edition.
 ---
 
-Here's my solution to exercise 3, chapter 3, of [Gelman's](https://andrewgelman.com/) *Bayesian Data Analysis* (BDA), 3rd edition. There are [solutions](http://www.stat.columbia.edu/~gelman/book/solutions.pdf) to some of the exercises on the [book's webpage](http://www.stat.columbia.edu/~gelman/book/).
+Here's my solution to exercise 3, chapter 3, of
+[Gelman's](https://andrewgelman.com/) *Bayesian Data Analysis* (BDA),
+3rd edition. There are
+[solutions](http://www.stat.columbia.edu/~gelman/book/solutions.pdf) to
+some of the exercises on the [book's
+webpage](http://www.stat.columbia.edu/~gelman/book/).
 
 <!--more-->
-
 <div style="display:none">
-  $\DeclareMathOperator{\dbinomial}{Binomial}
-   \DeclareMathOperator{\dbern}{Bernoulli}
-   \DeclareMathOperator{\dpois}{Poisson}
-   \DeclareMathOperator{\dnorm}{Normal}
-   \DeclareMathOperator{\dt}{t}
-   \DeclareMathOperator{\dcauchy}{Cauchy}
-   \DeclareMathOperator{\dexponential}{Exp}
-   \DeclareMathOperator{\dgamma}{Gamma}
-   \DeclareMathOperator{\dinvgamma}{InvGamma}
-   \DeclareMathOperator{\invlogit}{InvLogit}
-   \DeclareMathOperator{\logit}{Logit}
-   \DeclareMathOperator{\ddirichlet}{Dirichlet}
-   \DeclareMathOperator{\dbeta}{Beta}$
+
+$\DeclareMathOperator{\dbinomial}{Binomial}  \DeclareMathOperator{\dbern}{Bernoulli}  \DeclareMathOperator{\dpois}{Poisson}  \DeclareMathOperator{\dnorm}{Normal}  \DeclareMathOperator{\dt}{t}  \DeclareMathOperator{\dcauchy}{Cauchy}  \DeclareMathOperator{\dexponential}{Exp}  \DeclareMathOperator{\dgamma}{Gamma}  \DeclareMathOperator{\dinvgamma}{InvGamma}  \DeclareMathOperator{\invlogit}{InvLogit}  \DeclareMathOperator{\logit}{Logit}  \DeclareMathOperator{\ddirichlet}{Dirichlet}  \DeclareMathOperator{\dbeta}{Beta}$
+
 </div>
 
+Suppose we have $n$ measurements
+$y \mid \mu, \sigma \sim \dnorm(\mu, \sigma)$, where the prior
+$p(\mu, \log \sigma) \propto 1$ is uniform. The calculations on page 66
+show that the marginal posterior distribution of $\mu$ is
+$\mu \mid y \sim \dt(\bar y, s / n)$, where $s$ is the sample standard
+deviation. The measurements are as follows.
 
-
-Suppose we have $n$ measurements $y \mid \mu, \sigma \sim \dnorm(\mu, \sigma)$, where the prior $p(\mu, \log \sigma) \propto 1$ is uniform. The calculations on page 66 show that the marginal posterior distribution of $\mu$ is $\mu \mid y \sim \dt(\bar y, s / n)$, where $s$ is the sample standard deviation. The measurements are as follows.
-
-
-
-```r
+``` {.r}
 control <- list(
   n = 32,
   mean = 1.013,
@@ -51,17 +50,19 @@ treatment <- list(
 )
 ```
 
-The t-distribution in base-R is a standardised t-distribution. For a more general t-distribution (with arbitrary location and scale), we'll use the [LaplacesDemon](https://www.rdocumentation.org/packages/LaplacesDemon/versions/16.1.1) package.
+The t-distribution in base-R is a standardised t-distribution. For a
+more general t-distribution (with arbitrary location and scale), we'll
+use the
+[LaplacesDemon](https://www.rdocumentation.org/packages/LaplacesDemon/versions/16.1.1)
+package.
 
-
-```r
+``` {.r}
 library(LaplacesDemon)
 ```
 
-This allows us to plot the marginal posterior means. 
+This allows us to plot the marginal posterior means.
 
-
-```r
+``` {.r}
 mp <- tibble(value = seq(0, 2, 0.01)) %>% 
   mutate(
     ctrl = dst(value, control$mean, control$sd / sqrt(control$n), control$n - 1),
@@ -70,12 +71,11 @@ mp <- tibble(value = seq(0, 2, 0.01)) %>%
   gather(cohort, density, ctrl, trt) 
 ```
 
-![plot of chunk mp_plot](figure/mp_plot-1.png)
+![](chapter_03_exercise_03_files/figure-markdown/mp_plot-1.png)
 
 The 95% credible interval of the marginal posterior means is:
 
-
-```r
+``` {.r}
 draws <- 10000
 
 difference <- tibble(draw = 1:draws) %>% 
@@ -91,13 +91,9 @@ ci <- difference$difference %>%
 ci
 ```
 
-```
-        5%        95% 
-0.06825886 0.25376942 
-```
+            5%        95% 
+    0.06752309 0.25173035 
 
 We can also plot the distribution of the difference.
-  
-![plot of chunk diffs_plot](figure/diffs_plot-1.png)
 
-
+![](chapter_03_exercise_03_files/figure-markdown/diffs_plot-1.png)

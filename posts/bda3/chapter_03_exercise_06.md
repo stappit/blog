@@ -1,42 +1,41 @@
 ---
-title: "BDA3 Chapter 3 Exercise 6"
-author: "Brian Callander"
-date: "2018-10-07"
-tags: bda chapter 3, solutions, bayes, hierarchical, grid approximation, binomial, log-factorial, stirling's approximation
-tldr: Here's my solution to exercise 6, chapter 3, of Gelman's Bayesian Data Analysis (BDA), 3rd edition.
-always_allow_html: yes
-output: 
+always_allow_html: True
+author: Brian Callander
+date: '2018-10-07'
+output:
   md_document:
+    preserve_yaml: True
     variant: markdown
-    preserve_yaml: yes
+tags: |
+    bda chapter 3, solutions, bayes, hierarchical, grid approximation,
+    binomial, log-factorial, stirling's approximation
+title: BDA3 Chapter 3 Exercise 6
+tldr: |
+    Here's my solution to exercise 6, chapter 3, of Gelman's Bayesian Data
+    Analysis (BDA), 3rd edition.
 ---
 
-Here's my solution to exercise 6, chapter 3, of [Gelman's](https://andrewgelman.com/) *Bayesian Data Analysis* (BDA), 3rd edition. There are [solutions](http://www.stat.columbia.edu/~gelman/book/solutions.pdf) to some of the exercises on the [book's webpage](http://www.stat.columbia.edu/~gelman/book/).
+Here's my solution to exercise 6, chapter 3, of
+[Gelman's](https://andrewgelman.com/) *Bayesian Data Analysis* (BDA),
+3rd edition. There are
+[solutions](http://www.stat.columbia.edu/~gelman/book/solutions.pdf) to
+some of the exercises on the [book's
+webpage](http://www.stat.columbia.edu/~gelman/book/).
 
 <!--more-->
-
 <div style="display:none">
-  $\DeclareMathOperator{\dbinomial}{Binomial}
-   \DeclareMathOperator{\dbern}{Bernoulli}
-   \DeclareMathOperator{\dpois}{Poisson}
-   \DeclareMathOperator{\dnorm}{Normal}
-   \DeclareMathOperator{\dt}{t}
-   \DeclareMathOperator{\dcauchy}{Cauchy}
-   \DeclareMathOperator{\dexponential}{Exp}
-   \DeclareMathOperator{\duniform}{Uniform}
-   \DeclareMathOperator{\dgamma}{Gamma}
-   \DeclareMathOperator{\dinvgamma}{InvGamma}
-   \DeclareMathOperator{\invlogit}{InvLogit}
-   \DeclareMathOperator{\logit}{Logit}
-   \DeclareMathOperator{\ddirichlet}{Dirichlet}
-   \DeclareMathOperator{\dbeta}{Beta}$
+
+$\DeclareMathOperator{\dbinomial}{Binomial}  \DeclareMathOperator{\dbern}{Bernoulli}  \DeclareMathOperator{\dpois}{Poisson}  \DeclareMathOperator{\dnorm}{Normal}  \DeclareMathOperator{\dt}{t}  \DeclareMathOperator{\dcauchy}{Cauchy}  \DeclareMathOperator{\dexponential}{Exp}  \DeclareMathOperator{\duniform}{Uniform}  \DeclareMathOperator{\dgamma}{Gamma}  \DeclareMathOperator{\dinvgamma}{InvGamma}  \DeclareMathOperator{\invlogit}{InvLogit}  \DeclareMathOperator{\logit}{Logit}  \DeclareMathOperator{\ddirichlet}{Dirichlet}  \DeclareMathOperator{\dbeta}{Beta}$
+
 </div>
 
+Theory
+------
 
-
-## Theory
-
-Suppose we have binomial data where both the number of trials $N$ and the success rate $\theta$ are unknown and to be estimated. [Rafferty](http://pluto.huji.ac.il/~galelidan/52558/Material/Raftery.pdf) suggests the following hierarchical model:
+Suppose we have binomial data where both the number of trials $N$ and
+the success rate $\theta$ are unknown and to be estimated.
+[Rafferty](http://pluto.huji.ac.il/~galelidan/52558/Material/Raftery.pdf)
+suggests the following hierarchical model:
 
 $$
 \begin{align}
@@ -48,7 +47,8 @@ $$
 \end{align}
 $$
 
-where the parameter $\mu$ is also unknown. Instead of putting a prior on $\mu$, it is suggested to define 
+where the parameter $\mu$ is also unknown. Instead of putting a prior on
+$\mu$, it is suggested to define
 
 $$
 \begin{align}
@@ -58,7 +58,13 @@ $$
 \end{align}
 $$
 
-and to put a prior on $\lambda$. This is advantageous since $\lambda$ is the expected number of successes, which is easier to reason about than $N$ since we can actually observe it. The hierarchical structure allows us to be vague about the prior magnitude of $N$; an unconditional Poisson prior on $N$ could be a good idea if we had reason to believe it lies in the plausible range as defined by that prior. It is improper since its integral is the logarithm evaluated where it goes to infinity.
+and to put a prior on $\lambda$. This is advantageous since $\lambda$ is
+the expected number of successes, which is easier to reason about than
+$N$ since we can actually observe it. The hierarchical structure allows
+us to be vague about the prior magnitude of $N$; an unconditional
+Poisson prior on $N$ could be a good idea if we had reason to believe it
+lies in the plausible range as defined by that prior. It is improper
+since its integral is the logarithm evaluated where it goes to infinity.
 
 Let's find the corresponding prior on $N$. First note that
 
@@ -96,8 +102,9 @@ It follows that $p(\mu) \propto \mu^{-1}$. Thus,
   \frac{\mu^{N-1} e^{-\mu}}{N!}
   
 \end{align}
-
-From the definition of the [Gamma function](https://en.wikipedia.org/wiki/Gamma_function#Main_definition), it follows that
+From the definition of the [Gamma
+function](https://en.wikipedia.org/wiki/Gamma_function#Main_definition),
+it follows that
 
 $$
 \begin{align}
@@ -117,7 +124,7 @@ $$
 \end{align}
 $$
 
-The joint posterior is 
+The joint posterior is
 
 $$
 p(N, \theta \mid y)
@@ -151,39 +158,41 @@ $$
 \end{align}
 $$
 
-## Example
+Example
+-------
 
 Suppose we observe the following counts.
 
-
-```r
+``` {.r}
 counts <- tibble(count = c(53, 57, 66, 67, 72))
 ```
 
-We'd like to estimate the probability that $N > 100$. Stan can't help us here because the algorithm it uses requires parameters to be continuous. I learned a lot from approximating the posterior on a suitable grid, so let's do that.
+We'd like to estimate the probability that $N > 100$. Stan can't help us
+here because the algorithm it uses requires parameters to be continuous.
+I learned a lot from approximating the posterior on a suitable grid, so
+let's do that.
 
 Here's our first computational problem: overflow.
 
-
-```r
+``` {.r}
 counts$count %>% 
   sum() %>% 
   factorial() %>% 
   log()
 ```
 
-```
-Warning in factorial(.): value out of range in 'gammafn'
-```
+    Warning in factorial(.): value out of range in 'gammafn'
 
-```
-[1] Inf
-```
+    [1] Inf
 
-The factorial function gets big very fast, but computers can only deal with a finite range. John Cook has a [very useful post](https://www.johndcook.com/blog/2010/08/16/how-to-compute-log-factorial/) with several solutions to get around this problem. I couldn't find a definitive answer on how to make efficient hash tables in base R, so I'll just use vectors.
+The factorial function gets big very fast, but computers can only deal
+with a finite range. John Cook has a [very useful
+post](https://www.johndcook.com/blog/2010/08/16/how-to-compute-log-factorial/)
+with several solutions to get around this problem. I couldn't find a
+definitive answer on how to make efficient hash tables in base R, so
+I'll just use vectors.
 
-
-```r
+``` {.r}
 # slow but exact
 logfactorial0 <- function(k)
   1:k %>% 
@@ -211,47 +220,42 @@ logfactorial <- function(k) {
 }
 ```
 
+To convince ourselves our functions work correctly, we can look at a few
+examples.
 
-To convince ourselves our functions work correctly, we can look at a few examples.
-
-
-```r
+``` {.r}
 1:4 %>% 
   map(logfactorial) %>% 
   map(exp)
 ```
 
-```
-[[1]]
-[1] 1
+    [[1]]
+    [1] 1
 
-[[2]]
-[1] 2
+    [[2]]
+    [1] 2
 
-[[3]]
-[1] 6
+    [[3]]
+    [1] 6
 
-[[4]]
-[1] 24
-```
+    [[4]]
+    [1] 24
 
-Now we can calculate the log of the factorial. The factorial itself though is still too large to be represented as a finite number.
+Now we can calculate the log of the factorial. The factorial itself
+though is still too large to be represented as a finite number.
 
-
-```r
+``` {.r}
 counts$count %>% 
   sum() %>% 
   logfactorial()
 ```
 
-```
-[1] 1500.856
-```
+    [1] 1500.856
 
-The log-factorial is enough for us to calculate the (unnormalised) log-density. 
-  
+The log-factorial is enough for us to calculate the (unnormalised)
+log-density.
 
-```r
+``` {.r}
 util <- function(N)
   counts %>% 
     mutate(
@@ -279,10 +283,13 @@ joint_posterior <- function(N, theta) {
 }
 ```
 
-In order to approximate the posterior on a grid, we need a suitable grid. It's only worth calculating this where the posterior is non-negligible. For a given $N$, the posterior can only have non-negligible density when $\theta N$ is near the range 50-75. We'll broaden that a bit and restrict it to be in the range 35-90.
+In order to approximate the posterior on a grid, we need a suitable
+grid. It's only worth calculating this where the posterior is
+non-negligible. For a given $N$, the posterior can only have
+non-negligible density when $\theta N$ is near the range 50-75. We'll
+broaden that a bit and restrict it to be in the range 35-90.
 
-
-```r
+``` {.r}
 grid_joint <- expand.grid(
     N = max(counts$count):5000,
     theta = seq(0, 1, 0.01)
@@ -297,23 +304,21 @@ grid_joint <- expand.grid(
   select(-unnormalised_density, -normalising_constant)
 ```
 
-![plot of chunk joint_plot](figure/joint_plot-1..svg)
+![](chapter_03_exercise_06_files/figure-markdown/joint_plot-1..svg)
 
 We can also calculate the marginal posterior of $N$.
 
-
-```r
+``` {.r}
 marginal <- grid_joint %>% 
   group_by(N) %>% 
   summarise(mass = sum(density)) 
 ```
 
-![plot of chunk marginal_plot](figure/marginal_plot-1..svg)
+![](chapter_03_exercise_06_files/figure-markdown/marginal_plot-1..svg)
 
 The posterior probability that $N > 100$ is then:
 
-
-```r
+``` {.r}
 grid_joint %>% 
   filter(N > 100) %>% 
   summarise(mass = sum(density)) %>% 
@@ -321,8 +326,4 @@ grid_joint %>%
   percent()
 ```
 
-```
-[1] "95.6%"
-```
-
-
+    [1] "95.6%"

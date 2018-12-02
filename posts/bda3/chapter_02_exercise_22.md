@@ -1,48 +1,63 @@
 ---
-title: "BDA3 Chapter 2 Exercise 22"
-author: "Brian Callander"
-date: "2018-09-09"
-tags: bda chapter 2, solutions, bayes, basketball, prior choice, weakly informative prior, noninformative prior
-tldr: Here's my solution to exercise 22, chapter 2, of Gelman's Bayesian Data Analysis (BDA), 3rd edition.
-always_allow_html: yes
-output: 
+always_allow_html: True
+author: Brian Callander
+date: '2018-09-09'
+output:
   md_document:
+    preserve_yaml: True
     variant: markdown
-    preserve_yaml: yes
+tags: |
+    bda chapter 2, solutions, bayes, basketball, prior choice, weakly
+    informative prior, noninformative prior
+title: BDA3 Chapter 2 Exercise 22
+tldr: |
+    Here's my solution to exercise 22, chapter 2, of Gelman's Bayesian Data
+    Analysis (BDA), 3rd edition.
 ---
 
-Here's my solution to exercise 22, chapter 2, of [Gelman's](https://andrewgelman.com/) *Bayesian Data Analysis* (BDA), 3rd edition. There are [solutions](http://www.stat.columbia.edu/~gelman/book/solutions.pdf) to some of the exercises on the [book's webpage](http://www.stat.columbia.edu/~gelman/book/).
+Here's my solution to exercise 22, chapter 2, of
+[Gelman's](https://andrewgelman.com/) *Bayesian Data Analysis* (BDA),
+3rd edition. There are
+[solutions](http://www.stat.columbia.edu/~gelman/book/solutions.pdf) to
+some of the exercises on the [book's
+webpage](http://www.stat.columbia.edu/~gelman/book/).
 
 <!--more-->
-
 <div style="display:none">
-  $\DeclareMathOperator{\dbinomial}{Binomial}
-   \DeclareMathOperator{\dbern}{Bernoulli}
-   \DeclareMathOperator{\dpois}{Poisson}
-   \DeclareMathOperator{\dnorm}{Normal}
-   \DeclareMathOperator{\dcauchy}{Cauchy}
-   \DeclareMathOperator{\dexponential}{Exp}
-   \DeclareMathOperator{\dgamma}{Gamma}
-   \DeclareMathOperator{\dinvgamma}{InvGamma}
-   \DeclareMathOperator{\invlogit}{InvLogit}
-   \DeclareMathOperator{\logit}{Logit}
-   \DeclareMathOperator{\dbeta}{Beta}$
+
+$\DeclareMathOperator{\dbinomial}{Binomial}  \DeclareMathOperator{\dbern}{Bernoulli}  \DeclareMathOperator{\dpois}{Poisson}  \DeclareMathOperator{\dnorm}{Normal}  \DeclareMathOperator{\dcauchy}{Cauchy}  \DeclareMathOperator{\dexponential}{Exp}  \DeclareMathOperator{\dgamma}{Gamma}  \DeclareMathOperator{\dinvgamma}{InvGamma}  \DeclareMathOperator{\invlogit}{InvLogit}  \DeclareMathOperator{\logit}{Logit}  \DeclareMathOperator{\dbeta}{Beta}$
+
 </div>
 
+Suppose you have a random sample of 100 college students in a basketball
+study. Each student takes 100 free-throws to establish a baseline
+success probability, $\phi_0$. The students then take 50 practice
+free-throws per day for a month. After this month is up, each takes 100
+shots for a final measurement of success probability, $\phi_1$. We wish
+to estimate the increase in success probability,
+$\theta := \phi_1 - \phi_0$.
 
+We could use the uniform distribution on the range of theoretically
+possible values $[-1, 1]$ as a 'non-informative' prior, i.e. every level
+of increase is equally likely.
 
+![](chapter_02_exercise_22_files/figure-markdown/noninformative_prior-1..svg)
 
-Suppose you have a random sample of 100 college students in a basketball study. Each student takes 100 free-throws to establish a baseline success probability, $\phi_0$. The students then take 50 practice free-throws per day for a month. After this month is up, each takes 100 shots for a final measurement of success probability, $\phi_1$. We wish to estimate the increase in success probability, $\theta := \phi_1 - \phi_0$.
+To construct an informative prior, I had to do a bit of background
+reading as I have next to zero basketball knowledge. After some
+google-fu, it seems the [best of the
+best](https://www.basketball-reference.com/leaders/ft_pct_career.html)
+have a free-throw success rate of around 80-90%, and the [worst of the
+best](https://abcnews.go.com/Sports/free-throws-easy-consequences-failing/story?id=40769445)
+around 50-60%. This latter estimate probably lies on the upper extreme
+for random college students. From watching some [free throw
+videos](https://www.youtube.com/watch?v=LFF6_5hyokU), I would guess that
+I would have a success rate of about 10% (baseline).
 
-We could use the uniform distribution on the range of theoretically possible values $[-1, 1]$ as a 'non-informative' prior, i.e. every level of increase is equally likely.
+Let's model the baseline average as beta distributed around a mean of
+10% and upper extreme below 40%.
 
-![plot of chunk noninformative_prior](figure/noninformative_prior-1..svg)
-
-To construct an informative prior, I had to do a bit of background reading as I have next to zero basketball knowledge. After some google-fu, it seems the [best of the best](https://www.basketball-reference.com/leaders/ft_pct_career.html) have a free-throw success rate of around 80-90%, and the [worst of the best](https://abcnews.go.com/Sports/free-throws-easy-consequences-failing/story?id=40769445) around 50-60%. This latter estimate probably lies on the upper extreme for random college students. From watching some [free throw videos](https://www.youtube.com/watch?v=LFF6_5hyokU), I would guess that I would have a success rate of about 10% (baseline).
-
-Let's model the baseline average as beta distributed around a mean of 10% and upper extreme below 40%. 
-
-```r
+``` {.r}
 mu0 <- 0.10
 n0 <- 15
 
@@ -65,14 +80,16 @@ tibble(
   )
 ```
 
-![plot of chunk baseline_simulation](figure/baseline_simulation-1..svg)
+![](chapter_02_exercise_22_files/figure-markdown/baseline_simulation-1..svg)
 
 With this assumption, there is a 0.286% chance of an average above 40%.
 
-For the final estimate, the improvement could be quite significant given that random students are likely untrained (the better you get, the harder it is to improve). An average 15%% improvement seems plausible to me. 
+For the final estimate, the improvement could be quite significant given
+that random students are likely untrained (the better you get, the
+harder it is to improve). An average 15%% improvement seems plausible to
+me.
 
-
-```r
+``` {.r}
 mu1 <- mu0 + 0.15
 n1 <- 20
 
@@ -95,12 +112,14 @@ tibble(
   )
 ```
 
-![plot of chunk final_simulation](figure/final_simulation-1..svg)
+![](chapter_02_exercise_22_files/figure-markdown/final_simulation-1..svg)
 
-With the above assumptions, the distribution of the average increase is shown below. The bulk of the mass is above 0, which makes sense as most should improve through practice. There is also some chance of a decrease, with -25%% being fairly extreme.
+With the above assumptions, the distribution of the average increase is
+shown below. The bulk of the mass is above 0, which makes sense as most
+should improve through practice. There is also some chance of a
+decrease, with -25%% being fairly extreme.
 
-
-```r
+``` {.r}
 increase <- tibble(
     phi0 = rbeta(10000, alpha0, beta0),
     phi1 = rbeta(10000, alpha1, beta1),
@@ -121,12 +140,14 @@ increase %>%
   )
 ```
 
-![plot of chunk increase_simulation](figure/increase_simulation-1..svg)
+![](chapter_02_exercise_22_files/figure-markdown/increase_simulation-1..svg)
 
-We could approximate this as a beta distribution on $[-1, 1]$ to ensure the prior is bounded. In this case, we can probably get away with using a normal distribution since the probability of exceeding the bounds is negligible.
+We could approximate this as a beta distribution on $[-1, 1]$ to ensure
+the prior is bounded. In this case, we can probably get away with using
+a normal distribution since the probability of exceeding the bounds is
+negligible.
 
-
-```r
+``` {.r}
 mu <- mu1 - mu0
 sigma <- sd(increase$theta)
 
@@ -148,15 +169,19 @@ tibble(
   NULL
 ```
 
-![plot of chunk informative_prior](figure/informative_prior-1..svg)
+![](chapter_02_exercise_22_files/figure-markdown/informative_prior-1..svg)
 
-The probability that this normal distribution exceeds 1 is 0.0000000000698%.
-A subjective prior for the average increase in success probability would thus be a $\dnorm(0.15, 0.12)$ prior.
+The probability that this normal distribution exceeds 1 is
+0.0000000000719%. A subjective prior for the average increase in success
+probability would thus be a $\dnorm(0.15, 0.12)$ prior.
 
-Finally, let's construct a weakly informative prior. We'll again use the beta distribution scaled to the interval $[-1, 1]$, with a mean of 0 so that an increase can be entirely attributed to the data and not to the prior. Since the best of the pros have a success probability around 90%, we'd expect the increase of 100 random students to be below this value.
+Finally, let's construct a weakly informative prior. We'll again use the
+beta distribution scaled to the interval $[-1, 1]$, with a mean of 0 so
+that an increase can be entirely attributed to the data and not to the
+prior. Since the best of the pros have a success probability around 90%,
+we'd expect the increase of 100 random students to be below this value.
 
-
-```r
+``` {.r}
 alpha <- 5
 beta <- 5
 
@@ -178,4 +203,4 @@ tibble(
   NULL
 ```
 
-![plot of chunk weakly_informative_prior](figure/weakly_informative_prior-1..svg)
+![](chapter_02_exercise_22_files/figure-markdown/weakly_informative_prior-1..svg)

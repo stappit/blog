@@ -1,25 +1,38 @@
 ---
-title: "Understanding the hazard function"
-author: "Brian Callander"
-date: "2018-08-05"
-tags: hazard, censoring, survival, exponential, poisson
-tldr: This post looks into the intuition behind the hazard function as used in survival analysis. We also show how to calculate the hazard of an exponential survival model using maximum likelihood estimation by considering the likelihood as a Poisson likelihood.
-always_allow_html: yes
-output: 
+always_allow_html: True
+author: Brian Callander
+date: '2018-08-05'
+output:
   md_document:
+    preserve_yaml: True
     variant: markdown
-    preserve_yaml: true
+tags: 'hazard, censoring, survival, exponential, poisson'
+title: Understanding the hazard function
+tldr: |
+    This post looks into the intuition behind the hazard function as used in
+    survival analysis. We also show how to calculate the hazard of an
+    exponential survival model using maximum likelihood estimation by
+    considering the likelihood as a Poisson likelihood.
 ---
 
-
-
-Suppose you have fit a distribution to your censored survival times as in the [previous post](./censoring.html) and now want to quantify the intuition of an event being imminent. For example, being able to characterise precisely when your customers are about to churn can help identify problem areas to improve on. This notion is called the *hazard*. We'll take a look at some of its main properties and how it related to survival analysis.
+Suppose you have fit a distribution to your censored survival times as
+in the [previous post](./censoring.html) and now want to quantify the
+intuition of an event being imminent. For example, being able to
+characterise precisely when your customers are about to churn can help
+identify problem areas to improve on. This notion is called the
+*hazard*. We'll take a look at some of its main properties and how it
+related to survival analysis.
 
 <!--more-->
+Definition
+----------
 
-## Definition
-
-Start with a small $\delta$-interval around t and and consider the average probability density of an event ocurring in that interval given that it occurs after t: $\frac{\mathbb P(t \le T < t + \delta \mid t \le T)}{\delta}$, where $\mathbb P$ is the probability function. To get rid of the arbitrary choice of $\delta$, we take the limit as $\delta$ goes to zero.
+Start with a small $\delta$-interval around t and and consider the
+average probability density of an event ocurring in that interval given
+that it occurs after t:
+$\frac{\mathbb P(t \le T < t + \delta \mid t \le T)}{\delta}$, where
+$\mathbb P$ is the probability function. To get rid of the arbitrary
+choice of $\delta$, we take the limit as $\delta$ goes to zero.
 
 $$
 h(t)
@@ -28,19 +41,26 @@ h(t)
 .
 $$
 
-This is well-defined whenever the CDF is differentiable. Although it is defined in terms of probabilities, we will show below that the hazard is not itself a probability density function.
+This is well-defined whenever the CDF is differentiable. Although it is
+defined in terms of probabilities, we will show below that the hazard is
+not itself a probability density function.
 
-## Identities
+Identities
+----------
 
-There are a number of useful properties of the hazard function that make it convenient to work with in survival analysis. 
+There are a number of useful properties of the hazard function that make
+it convenient to work with in survival analysis.
 
 ### Equivalent definition
 
-The above definition helps us understand the intuition behind the hazard function but there's an equivalent formulation that can be easier to work with.  Using 
+The above definition helps us understand the intuition behind the hazard
+function but there's an equivalent formulation that can be easier to
+work with. Using
 
-* the definition of conditional probabilities,
-* the definition of a derivative, and 
-* that $F'(t) = f(t)$ where $F$ is the CDF and $f$ the probability function,
+-   the definition of conditional probabilities,
+-   the definition of a derivative, and
+-   that $F'(t) = f(t)$ where $F$ is the CDF and $f$ the probability
+    function,
 
 we can show that
 
@@ -62,11 +82,14 @@ $$
 \end{align}
 $$
 
-We will show below how to use this to simplify the likelihood in the case of censored observations for measuring time to an event of interest.
+We will show below how to use this to simplify the likelihood in the
+case of censored observations for measuring time to an event of
+interest.
 
 ### Relation with the survival function
 
-Using the identity above, we can rewrite the hazard as a derivative of the survival function:
+Using the identity above, we can rewrite the hazard as a derivative of
+the survival function:
 
 $$
 h(t)
@@ -77,15 +100,20 @@ h(t)
 .
 $$
 
-It then follows from the [first fundamental theorem of calculus](https://en.wikipedia.org/wiki/Fundamental_theorem_of_calculus) that
+It then follows from the [first fundamental theorem of
+calculus](https://en.wikipedia.org/wiki/Fundamental_theorem_of_calculus)
+that
 
 $$
 S(t) = e^{-\int_0^t h(s) ds}.
 $$
 
-In other words, the hazard function completely determines the survival function (and therefore also the mass/density function).
+In other words, the hazard function completely determines the survival
+function (and therefore also the mass/density function).
 
-Since the integral of the hazard appears in the above equation, we can give it a definition for easier reference. We define the *cumulative hazard* as
+Since the integral of the hazard appears in the above equation, we can
+give it a definition for easier reference. We define the *cumulative
+hazard* as
 
 $$
 H(t) 
@@ -94,15 +122,25 @@ H(t)
 .
 $$
 
-Since $\lim_{t \rightarrow \infty} S(t) = 0$, it follows that $\lim_{t \rightarrow \infty} H(t) = -\lim \log S(t) = \infty$. In particular, this means that the hazard function is NOT a probability density function!
+Since $\lim_{t \rightarrow \infty} S(t) = 0$, it follows that
+$\lim_{t \rightarrow \infty} H(t) = -\lim \log S(t) = \infty$. In
+particular, this means that the hazard function is NOT a probability
+density function!
 
 ### Example
 
-The exponential distribution has constant hazard. To see this, suppose $h(t) = \lambda$. Then $S(t) = \exp(-\int_0^t \lambda ds) = \exp(-\lambda t)$ so that $f(t) = -S'(t) = \lambda \exp(-\lambda t)$, which is the probability function for the [exponential distribution](https://en.wikipedia.org/wiki/Exponential_distribution).
+The exponential distribution has constant hazard. To see this, suppose
+$h(t) = \lambda$. Then
+$S(t) = \exp(-\int_0^t \lambda ds) = \exp(-\lambda t)$ so that
+$f(t) = -S'(t) = \lambda \exp(-\lambda t)$, which is the probability
+function for the [exponential
+distribution](https://en.wikipedia.org/wiki/Exponential_distribution).
 
-## Hazard in censored survival analysis
+Hazard in censored survival analysis
+------------------------------------
 
-In [the previous post](./censoring.html), we motivated the following likelihood in the case of censored survival times:
+In [the previous post](./censoring.html), we motivated the following
+likelihood in the case of censored survival times:
 
 $$
 L(\theta) 
@@ -112,7 +150,9 @@ L(\theta)
 \prod_{i = 1}^N (1 - \delta_i) S(t_i \mid \theta)
 $$
 
-where $\delta_i$ is 1 if the event is observed and 0 if it is censored, and $\theta$ is the vector of parameters of the distribution of survival times. Since $f(t) = h(t) S(t)$, we can rewrite this as
+where $\delta_i$ is 1 if the event is observed and 0 if it is censored,
+and $\theta$ is the vector of parameters of the distribution of survival
+times. Since $f(t) = h(t) S(t)$, we can rewrite this as
 
 $$
 L(\theta) 
@@ -122,7 +162,8 @@ $$
 
 ### Example
 
-Assuming that survival times follow an exponential distribution, the hazard $h(t) = \lambda$ is constant, and the likelihood is
+Assuming that survival times follow an exponential distribution, the
+hazard $h(t) = \lambda$ is constant, and the likelihood is
 
 $$
   L(\lambda)
@@ -132,13 +173,20 @@ $$
   \lambda^D e^{-\lambda T}
 $$
 
-where $D := \sum_1^N \delta_i$ is the total number of events observed and $T := \sum_1^N t_i$ is the total observation time. This expression has an interesting interpretation as a [Poisson](https://en.wikipedia.org/wiki/Poisson_distribution) likelihood. To see this, first note that $T$ and $D$ can be considered constant in our likelihood because they don't depend on our only parameter $\lambda$. We can consider $D$ as a Poisson variable with rate $\lambda$ and exposure $T$:
+where $D := \sum_1^N \delta_i$ is the total number of events observed
+and $T := \sum_1^N t_i$ is the total observation time. This expression
+has an interesting interpretation as a
+[Poisson](https://en.wikipedia.org/wiki/Poisson_distribution)
+likelihood. To see this, first note that $T$ and $D$ can be considered
+constant in our likelihood because they don't depend on our only
+parameter $\lambda$. We can consider $D$ as a Poisson variable with rate
+$\lambda$ and exposure $T$:
 
 $$
 D \mid \lambda \sim \text{Poisson}(\lambda T),
 $$
 
-which gives probability of observing $D$ events as 
+which gives probability of observing $D$ events as
 
 $$
 \text{Poisson}(D \mid \lambda T)
@@ -149,4 +197,5 @@ T^D L(\lambda)
 .
 $$
 
-However, likelihoods are equivalent up to a multiplicative constant. Since $T^D$ is constant we can treat our likelihood, $L$, as Poisson. 
+However, likelihoods are equivalent up to a multiplicative constant.
+Since $T^D$ is constant we can treat our likelihood, $L$, as Poisson.

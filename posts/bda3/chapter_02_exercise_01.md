@@ -1,29 +1,35 @@
 ---
-title: "BDA3 Chapter 2 Exercise 1"
-author: "Brian Callander"
-date: "2018-08-20"
-tags: stan, beta, binomial, bayes, solutions, bda chapter 2, bda
-tldr: Here's my solution to exercise 1, chapter 2, of Gelman's Bayesian Data Analysis (BDA), 3rd edition.
-always_allow_html: yes
-output: 
+always_allow_html: True
+author: Brian Callander
+date: '2018-08-20'
+output:
   md_document:
+    preserve_yaml: True
     variant: markdown
-    preserve_yaml: yes
+tags: 'stan, beta, binomial, bayes, solutions, bda chapter 2, bda'
+title: BDA3 Chapter 2 Exercise 1
+tldr: |
+    Here's my solution to exercise 1, chapter 2, of Gelman's Bayesian Data
+    Analysis (BDA), 3rd edition.
 ---
 
-Here's my solution to exercise 1, chapter 2, of [Gelman's](https://andrewgelman.com/) *Bayesian Data Analysis* (BDA), 3rd edition. There are [solutions](http://www.stat.columbia.edu/~gelman/book/solutions.pdf) to some of the exercises on the [book's webpage](http://www.stat.columbia.edu/~gelman/book/).
+Here's my solution to exercise 1, chapter 2, of
+[Gelman's](https://andrewgelman.com/) *Bayesian Data Analysis* (BDA),
+3rd edition. There are
+[solutions](http://www.stat.columbia.edu/~gelman/book/solutions.pdf) to
+some of the exercises on the [book's
+webpage](http://www.stat.columbia.edu/~gelman/book/).
 
 <!--more-->
-
-
-
 <div style="display:none">
-  $\DeclareMathOperator{\dbinomial}{binomial}
-   \DeclareMathOperator{\dbern}{Bernoulli}
-   \DeclareMathOperator{\dbeta}{beta}$
+
+$\DeclareMathOperator{\dbinomial}{binomial}  \DeclareMathOperator{\dbern}{Bernoulli}  \DeclareMathOperator{\dbeta}{beta}$
+
 </div>
 
-Let $H$ be the number of heads in 10 tosses of the coin. With a $\dbeta(4, 4)$ prior on the probability $\theta$ of a head, the posterior after finding out $H \le 2$ is
+Let $H$ be the number of heads in 10 tosses of the coin. With a
+$\dbeta(4, 4)$ prior on the probability $\theta$ of a head, the
+posterior after finding out $H \le 2$ is
 
 $$
 \begin{align}
@@ -39,10 +45,10 @@ $$
 \end{align}
 $$
 
-We can plot this unnormalised posterior density from the following dataset.
+We can plot this unnormalised posterior density from the following
+dataset.
 
-
-```r
+``` {.r}
 ex1 <- tibble(
          theta = seq(0, 1, 0.01), 
          prior = theta^3 * (1 - theta)^3,
@@ -54,40 +60,37 @@ ex1 <- tibble(
        )
 ```
 
-![plot of chunk ex1_plot](figure/ex1_plot-1.png)
+![](chapter_02_exercise_01_files/figure-markdown/ex1_plot-1.png)
 
-With the help of [Stan](http://mc-stan.org/), we can obtain the normalised posterior density. We include the information that there are at most 2 heads observed by using the (log) cumulative density function.
+With the help of [Stan](http://mc-stan.org/), we can obtain the
+normalised posterior density. We include the information that there are
+at most 2 heads observed by using the (log) cumulative density function.
 
-
-```r
+``` {.r}
 m1 <- rstan::stan_model('src/ex_02_01.stan')
 ```
 
+    S4 class stanmodel 'ex_02_01' coded as follows:
+    transformed data {
+      int tosses = 10;
+      int max_heads = 2;
+    }
 
-```
-S4 class stanmodel 'ex_02_01' coded as follows:
-transformed data {
-  int tosses = 10;
-  int max_heads = 2;
-}
+    parameters {
+      real<lower = 0, upper = 1> theta;
+    }
 
-parameters {
-  real<lower = 0, upper = 1> theta;
-}
+    model {
+      theta ~ beta(4, 4); // prior 
+      target += binomial_lcdf(max_heads | tosses, theta); // likelihood
+    } 
 
-model {
-  theta ~ beta(4, 4); // prior 
-  target += binomial_lcdf(max_heads | tosses, theta); // likelihood
-} 
-```
+The following posterior has the same shape as our exact unnormalised
+density above. The difference is that we now have a normalised
+probability distribution without having to work out the maths ourselves.
 
-The following posterior has the same shape as our exact unnormalised density above. The difference is that we now have a normalised probability distribution without having to work out the maths ourselves.
-
-
-```r
+``` {.r}
 f1 <- sampling(m1, iter = 40000, warmup = 500, chains = 1)
 ```
 
-![plot of chunk ex1_stan_plot](figure/ex1_stan_plot-1.png)
-
-
+![](chapter_02_exercise_01_files/figure-markdown/ex1_stan_plot-1.png)

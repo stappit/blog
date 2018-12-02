@@ -1,31 +1,36 @@
 ---
-title: "BDA3 Chapter 2 Exercise 8"
-author: "Brian Callander"
-date: "2018-08-27"
-tags: bda chapter 2, bda, solutions, bayes, normal, posterior predictive
-tldr: Here's my solution to exercise 8, chapter 2, of Gelman's Bayesian Data Analysis (BDA), 3rd edition.
-always_allow_html: yes
-output: 
+always_allow_html: True
+author: Brian Callander
+date: '2018-08-27'
+output:
   md_document:
+    preserve_yaml: True
     variant: markdown
-    preserve_yaml: yes
+tags: 'bda chapter 2, bda, solutions, bayes, normal, posterior predictive'
+title: BDA3 Chapter 2 Exercise 8
+tldr: |
+    Here's my solution to exercise 8, chapter 2, of Gelman's Bayesian Data
+    Analysis (BDA), 3rd edition.
 ---
 
-Here's my solution to exercise 8, chapter 2, of [Gelman's](https://andrewgelman.com/) *Bayesian Data Analysis* (BDA), 3rd edition. There are [solutions](http://www.stat.columbia.edu/~gelman/book/solutions.pdf) to some of the exercises on the [book's webpage](http://www.stat.columbia.edu/~gelman/book/).
+Here's my solution to exercise 8, chapter 2, of
+[Gelman's](https://andrewgelman.com/) *Bayesian Data Analysis* (BDA),
+3rd edition. There are
+[solutions](http://www.stat.columbia.edu/~gelman/book/solutions.pdf) to
+some of the exercises on the [book's
+webpage](http://www.stat.columbia.edu/~gelman/book/).
 
 <!--more-->
-
 <div style="display:none">
-  $\DeclareMathOperator{\dbinomial}{binomial}
-   \DeclareMathOperator{\dbern}{Bernoulli}
-   \DeclareMathOperator{\dnorm}{normal}
-   \DeclareMathOperator{\dgamma}{gamma}
-   \DeclareMathOperator{\invlogit}{invlogit}
-   \DeclareMathOperator{\logit}{logit}
-   \DeclareMathOperator{\dbeta}{beta}$
+
+$\DeclareMathOperator{\dbinomial}{binomial}  \DeclareMathOperator{\dbern}{Bernoulli}  \DeclareMathOperator{\dnorm}{normal}  \DeclareMathOperator{\dgamma}{gamma}  \DeclareMathOperator{\invlogit}{invlogit}  \DeclareMathOperator{\logit}{logit}  \DeclareMathOperator{\dbeta}{beta}$
+
 </div>
 
-With prior $\theta \sim \dnorm(180, 40)$, sampling distribution $y \mid \theta \sim \dnorm(\theta, 20)$, and $n$ sampled students with average weight $\bar y = 150$, it follows from 2.11 that the posterior mean is 
+With prior $\theta \sim \dnorm(180, 40)$, sampling distribution
+$y \mid \theta \sim \dnorm(\theta, 20)$, and $n$ sampled students with
+average weight $\bar y = 150$, it follows from 2.11 that the posterior
+mean is
 
 $$
 \begin{align}
@@ -52,16 +57,17 @@ $$
   .
 \end{align}
 $$
-  
-  
-So $\theta \mid \bar y ~ \dnorm \left( \frac{60(3 + 10n)}{1 + 4n}, \frac{40}{\sqrt{1 + 4n}} \right)$.
 
-It follows from the calculations shown in the book that the posterior predictive distribution is $\tilde y \mid y \sim \dnorm(\mu, \sigma + 20)$.
+So
+$\theta \mid \bar y ~ \dnorm \left( \frac{60(3 + 10n)}{1 + 4n}, \frac{40}{\sqrt{1 + 4n}} \right)$.
+
+It follows from the calculations shown in the book that the posterior
+predictive distribution is
+$\tilde y \mid y \sim \dnorm(\mu, \sigma + 20)$.
 
 We can obtain 95% posterior intervals as follows.
 
-
-```r
+``` {.r}
 mu <- function(n) 60 * (3 + 10 * n) / (1 + 4 * n)
 sigma <- function(n) 40 / sqrt(1 + 4 * n)
 
@@ -71,12 +77,13 @@ theta_posterior_interval <- qnorm(percentiles, mu(10), sigma(10))
 y_posterior_interval <- qnorm(percentiles, mu(10), sigma(10) + 20)
 ```
 
-With a sample of size of 10, we get θ ϵ [140.5, 161] and $\tilde y$ ϵ [107.6, 193.9].
+With a sample of size of 10, we get θ ϵ \[140.5, 161\] and $\tilde y$ ϵ
+\[107.6, 193.9\].
 
-
-```r
+``` {.r}
 theta_posterior_interval <- qnorm(percentiles, mu(100), sigma(100))
 y_posterior_interval <- qnorm(percentiles, mu(100), sigma(100) + 20)
 ```
 
-With a sample of size of 100, we get θ ϵ [146.8, 153.4] and $\tilde y$ ϵ [113.9, 186.3].
+With a sample of size of 100, we get θ ϵ \[146.8, 153.4\] and $\tilde y$
+ϵ \[113.9, 186.3\].

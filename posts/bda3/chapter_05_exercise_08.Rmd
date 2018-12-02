@@ -82,7 +82,7 @@ To apply this to a concrete example, suppose $y \mid \theta \sim \dnorm(\theta, 
 ```{r prior}
 mu_pos <- 1
 sd_pos <- 0.5
-lambda_pos <- 0.9
+lambda_pos <- 0.8
 
 mu_neg <- -1
 sd_neg <- 0.5
