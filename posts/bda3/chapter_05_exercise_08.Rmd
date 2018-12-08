@@ -96,7 +96,7 @@ prior <- tibble(
 )
 ```
 
-```{r prior_plot, echo = FALSE}
+```{r prior_plot, echo = FALSE, fig.cap="conjugate mixture prior"}
 prior %>% 
   ggplot() +
   aes(theta, density) +

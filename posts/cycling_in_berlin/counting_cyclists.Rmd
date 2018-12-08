@@ -1,5 +1,5 @@
 ---
-title: "Counting cylists in Berlin"
+title: "Counting cyclists in Berlin"
 author: "Brian Callander"
 date: "2018-11-29"
 tags: berlin, cycling, open data, eda, timeseries, excel
@@ -291,7 +291,7 @@ by_counter <- df %>%
   ) 
 ```
 
-```{r by_counter_plot, echo=FALSE} 
+```{r by_counter_plot, echo=FALSE, fig.cap='Counts by counter'} 
 by_counter %>% 
   ggplot() +
   aes(reorder(counter_id, q50), ymin = q25, y = q50, ymax = q75) +
@@ -319,7 +319,7 @@ by_hour <- df %>%
   ) 
 ```
 
-```{r by_hour_plot, echo = FALSE}
+```{r by_hour_plot, echo = FALSE, fig.cap='Counts by hour of the day'}
 by_hour %>% 
   ggplot() +
   aes(h, ymin = q25, y = q50, ymax = q75) +
@@ -351,7 +351,7 @@ pairs_by_hour <- df %>%
   summarise(difference = mean(difference)) 
 ```
 
-```{r pairs_by_hour_plot, echo=FALSE}
+```{r pairs_by_hour_plot, echo=FALSE, fig.cap='Difference in paired counts by hour of the day'}
 pairs_by_hour %>% 
   ggplot() +
   aes(g, difference, group = comparison) +
@@ -382,7 +382,7 @@ by_weekday <- df %>%
   ) 
 ```
 
-```{r by_weekday_plot, echo = FALSE}
+```{r by_weekday_plot, echo = FALSE, fig.cap='Counts by weekday'}
 by_weekday %>% 
   ggplot() +
   aes(g, ymin = q25, y = q50, ymax = q75) +
@@ -408,7 +408,7 @@ by_month <- df %>%
   ) 
 ```
 
-```{r by_month_plot, echo=FALSE}
+```{r by_month_plot, echo=FALSE, fig.cap='Counts by month'}
 by_month %>% 
   ggplot() +
   aes(g, ymin = q25, y = q50, ymax = q75) +
@@ -434,7 +434,7 @@ by_year <- df %>%
   ) 
 ```
 
-```{r by_year_plot, echo = FALSE}
+```{r by_year_plot, echo = FALSE, fig.cap='Counts by year'}
 by_year %>% 
   ggplot() +
   aes(g, ymin = q25, y = q50, ymax = q75) +

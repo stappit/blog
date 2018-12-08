@@ -82,7 +82,8 @@ prior <- tibble(
 )
 ```
 
-![](chapter_05_exercise_08_files/figure-markdown/prior_plot-1..svg)
+![conjugate mixture
+prior](chapter_05_exercise_08_files/figure-markdown/prior_plot-1..svg)
 
 The posterior for each mixture component can be calculated using
 equation 2.12 (page 42). In particular,

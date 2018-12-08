@@ -7,7 +7,7 @@ output:
     preserve_yaml: True
     variant: markdown
 tags: 'berlin, cycling, open data, eda, timeseries, excel'
-title: Counting cylists in Berlin
+title: Counting cyclists in Berlin
 tldr: |
     This is an exploratory data analysis of Berlin open data on bike
     counters around the city. There are strong commuter effects at hour of
@@ -1158,7 +1158,8 @@ by_counter <- df %>%
   ) 
 ```
 
-![](counting_cyclists_files/figure-markdown/by_counter_plot-1..svg)
+![Counts by
+counter](counting_cyclists_files/figure-markdown/by_counter_plot-1..svg)
 
 There is also a commuter-effect, with peaks showing at 08:00 and 17:00.
 There is almost no traffic in the wee hours of the morning.
@@ -1173,7 +1174,8 @@ by_hour <- df %>%
   ) 
 ```
 
-![](counting_cyclists_files/figure-markdown/by_hour_plot-1..svg)
+![Counts by hour of the
+day](counting_cyclists_files/figure-markdown/by_hour_plot-1..svg)
 
 Since there is a strong commuter-effect and some counters are paired to
 count different directions, it makes sense to take a look at the
@@ -1199,7 +1201,8 @@ pairs_by_hour <- df %>%
   summarise(difference = mean(difference)) 
 ```
 
-![](counting_cyclists_files/figure-markdown/pairs_by_hour_plot-1..svg)
+![Difference in paired counts by hour of the
+day](counting_cyclists_files/figure-markdown/pairs_by_hour_plot-1..svg)
 
 In Klosterstraße (`15-SP-KLO`) and Mariendorfer Damm (`20-TS-MAR`) it
 looks like traffic is roughly equal in both directions all day. The
@@ -1223,7 +1226,8 @@ by_weekday <- df %>%
   ) 
 ```
 
-![](counting_cyclists_files/figure-markdown/by_weekday_plot-1..svg)
+![Counts by
+weekday](counting_cyclists_files/figure-markdown/by_weekday_plot-1..svg)
 
 There is also a yearly seasonal pattern. Apart from berliners being more
 willing to commute in summer, I'd be willing to bet that tourists are
@@ -1241,7 +1245,8 @@ by_month <- df %>%
   ) 
 ```
 
-![](counting_cyclists_files/figure-markdown/by_month_plot-1..svg)
+![Counts by
+month](counting_cyclists_files/figure-markdown/by_month_plot-1..svg)
 
 There is no clear yearly effect, as the median just ambles around 60
 cyclist per hour.
@@ -1256,7 +1261,8 @@ by_year <- df %>%
   ) 
 ```
 
-![](counting_cyclists_files/figure-markdown/by_year_plot-1..svg)
+![Counts by
+year](counting_cyclists_files/figure-markdown/by_year_plot-1..svg)
 
 What's next?
 ------------
