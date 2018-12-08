@@ -1,0 +1,143 @@
+---
+title: "BDA3 Chapter 5 Exercise 9"
+author: "Brian Callander"
+date: "2018-12-03"
+tags: bda chapter 5, solutions, bayes, improper prior, hierarchical model, binomial
+tldr: Here's my solution to exercise 9, chapter 5, of Gelman's Bayesian Data Analysis (BDA), 3rd edition.
+always_allow_html: yes
+output: 
+  md_document:
+    variant: markdown
+    preserve_yaml: yes
+---
+
+Here's my solution to exercise 9, chapter 5, of [Gelman's](https://andrewgelman.com/) *Bayesian Data Analysis* (BDA), 3rd edition. There are [solutions](http://www.stat.columbia.edu/~gelman/book/solutions.pdf) to some of the exercises on the [book's webpage](http://www.stat.columbia.edu/~gelman/book/).
+
+<!--more-->
+
+<div style="display:none">
+  $\DeclareMathOperator{\dbinomial}{Binomial}
+   \DeclareMathOperator{\dbern}{Bernoulli}
+   \DeclareMathOperator{\dpois}{Poisson}
+   \DeclareMathOperator{\dnorm}{Normal}
+   \DeclareMathOperator{\dt}{t}
+   \DeclareMathOperator{\dcauchy}{Cauchy}
+   \DeclareMathOperator{\dexponential}{Exp}
+   \DeclareMathOperator{\duniform}{Uniform}
+   \DeclareMathOperator{\dgamma}{Gamma}
+   \DeclareMathOperator{\dinvgamma}{InvGamma}
+   \DeclareMathOperator{\invlogit}{InvLogit}
+   \DeclareMathOperator{\logit}{Logit}
+   \DeclareMathOperator{\ddirichlet}{Dirichlet}
+   \DeclareMathOperator{\dbeta}{Beta}$
+</div>
+
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(
+  echo = TRUE,
+  comment = NA,
+  message = FALSE,
+  warning = FALSE,
+  error = TRUE,
+  # cache = TRUE,
+  dev = "svglite",
+  fig.ext = ".svg" 
+)
+
+library(tidyverse)
+library(scales)
+library(kableExtra)
+
+theme_set(theme_bw())
+
+```
+
+## Part a
+
+Using the fact that $\Gamma(x + n) / \Gamma(x) = (x + n - 1) \cdots x$, we can simplify the posterior to
+
+$$
+p(\alpha, \beta) \prod_j \frac{\alpha \dotsm (\alpha + y_j - 1) \cdot \beta \dotsm (\beta + n_j - y_j - 1)}{(\alpha + \beta) \dotsm (\alpha + \beta + n_j - 1)}
+\\
+=
+p(\alpha, \beta) \prod_j \frac{\alpha}{\alpha + \beta} \dotsm \frac{\alpha + y_j - 1}{\alpha + \beta + y_j - 1} \cdot \frac{\beta}{\alpha + \beta + y_j} \dotsm \frac{\beta + n_j - y_j - 1}{\alpha + \beta + n_j - 1},
+$$
+
+which is always smaller than $p(\alpha, \beta)$ since each factor in the likelihood is always smaller than 1. Moreover, 
+
+$$
+p(\alpha, \beta \mid y)
+\ge
+p(\alpha, \beta) \prod_j \left[ \frac{\alpha}{\alpha + \beta} \right]^{y_j} \cdot \frac{\beta}{\alpha + \beta + y_j} \dotsm \frac{\beta + n_j - y_j - 1}{\alpha + \beta + n_j - 1}
+,
+$$
+
+since $\frac{x + k}{x + y + k} \ge \frac{x}{x + y}$ for any $x, y, k \gm 0$ such that $x + y > 0$. When $\alpha + \beta \gg 0$, this is approximately
+
+$$
+p(\alpha, \beta) \prod_j \left[ \frac{\alpha}{\alpha + \beta} \right]^{y_j} \cdot \left[ \frac{\beta}{\alpha + \beta} \right]^{n_j - y_j} 
+$$
+
+since $\frac{x}{x + y + k} \approx \frac{x}{x + y}$ for $x, y, k \ge 0$ such that $x + y > 0$. 
+
+```{r}
+simplest <- tibble(n = 2, y = 1)
+```
+
+```{r}
+lprior <- function(alpha, beta) -(5/2) * log(alpha + beta)
+prior <- function(alpha, beta) exp(lprior(alpha, beta))
+
+lposterior <- function(alpha, beta, df) {
+  p <- lprior(alpha, beta)
+  f <- 1 / lbeta(alpha, beta)
+  df %>% 
+    mutate(likelihood = lbeta(alpha + y, beta + n - y)) %>% 
+    summarise(
+      likelihood = sum(likelihood),
+      density = p + f + likelihood
+    ) %>% 
+    pull()
+}
+
+posterior <- function(alpha, beta, df) exp(lposterior(alpha, beta, df))
+
+prior(1, 1)
+posterior(0.001, 0.001, simplest)
+```
+
+
+# ```{r}
+# lower <- 0.0005
+# upper <- 10
+# 
+# g <- expand.grid(
+#     alpha = seq(lower, upper, length.out = 100),
+#     beta = seq(lower, upper, length.out = 100)
+#   ) %>% 
+#   as_tibble() %>%
+#   mutate(
+#     unnormalised_prior_density = prior(alpha, beta),
+#     unnormalised_posterior_density = map2_dbl(alpha, beta, posterior, simplest_stronger)
+#   ) %>% 
+#   group_by(alpha) %>% 
+#   arrange(beta) %>% 
+#   mutate(
+#     beta_low = lag(beta, default = 0),
+#     db = beta - beta_low
+#   ) %>% 
+#   group_by(beta) %>% 
+#   arrange(alpha) %>% 
+#   mutate(
+#     alpha_low = lag(alpha, default = 0),
+#     da = alpha - alpha_low
+#   ) %>% 
+#   ungroup() %>% 
+#   mutate(
+#     dab = da * db,
+#     posterior_density = dab * unnormalised_posterior_density / (sum(dab * unnormalised_posterior_density)),
+#     prior_density = dab * unnormalised_prior_density / (sum(dab * unnormalised_prior_density))
+#   )
+# ```
+
