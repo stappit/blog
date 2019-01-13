@@ -1,0 +1,26 @@
+\documentclass[crop]{standalone}
+
+\usepackage{amsmath}
+
+\usepackage{tikz}
+
+\usetikzlibrary{shapes,decorations,arrows,calc,arrows.meta,fit,positioning}
+\tikzset{
+    -Latex,auto,node distance =1 cm and 1 cm,semithick,
+    O/.style ={rectangle, draw, minimum width = 0.7 cm},
+    U/.style ={rectangle, draw, minimum width = 0.7 cm, dashed},
+    point/.style = {circle, draw, inner sep=0.04cm,fill,node contents={}},
+    bidirected/.style={Latex-Latex,dashed},
+    el/.style = {inner sep=2pt, align=left, sloped}
+}
+
+\begin{document}
+
+\begin{tikzpicture}
+  \node[O] (x) at (0,0) {Cohort};
+  \node[O] (y) [right =of x] {Click};
+  \path (x) edge (y);
+
+\end{tikzpicture}
+
+\end{document}
