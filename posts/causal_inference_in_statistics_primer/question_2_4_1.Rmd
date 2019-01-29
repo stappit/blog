@@ -1,0 +1,177 @@
+---
+title: "CIS Primer Question 2.4.1"
+author: "Brian Callander"
+date: "2019-01-28"
+tags: CISP chapter 2, casual inference, dag, conditional independence
+tldr: Here are my solutions to question 2.3.1 of Causal Inference in Statistics a Primer (CISP).
+always_allow_html: yes
+output: 
+  md_document:
+    variant: markdown
+    preserve_yaml: yes
+---
+
+Here are my solutions to question 2.3.1 of Causal Inference in Statistics: a Primer (CISP).
+
+<!--more-->
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(
+  echo = TRUE,
+  comment = NA,
+  message = FALSE,
+  warning = FALSE,
+  error = TRUE,
+  # cache = TRUE,
+  dev = "svglite"
+)
+
+library(tidyverse)
+library(scales)
+library(kableExtra)
+library(colorspace)
+
+theme_set(theme_bw())
+ 
+```
+
+We'll use the following simulated dataset to verify our answers. The coefficients are chosen so that each variable has approximately unit variance.
+
+```{r}
+set.seed(29490)
+
+N <- 10000 # sample size
+sigma <- 1 # variance of nodes
+e <- 0.1 # variance of errors
+
+df <- tibble(
+  id = 1:N,
+  z1 = rnorm(N, 0, sigma),
+  z2 = rnorm(N, 0, sigma),
+  z3 = sqrt(1/2) * (z1 + z2) + rnorm(N, 0, e),
+  x = sqrt(1/2) * (z1 + z3) + rnorm(N, 0, e),
+  w = x + rnorm(N, 0, e),
+  y = sqrt(1/3) * (w + z3 + z2) + rnorm(N, 0, e)
+)
+```
+
+## Part a
+
+The nodes $\{W, Z_1\}$, $\{W, Z_2\}$, and $\{W, Z_3\}$ are each d-separated by $X$.
+
+The nodes $\{X, Y\}$ are d-separated by $\{W, Z_1, Z_3\}$.
+
+The nodes $\{X, Z_2\}$ are d-separated by $\{Z_1, Z_3\}$.
+
+The nodes $\{Y, Z_1\}$ are d-separated by $\{W, Z_2, Z_3\}$.
+
+The nodes $\{Z_1, Z_2\}$ are d-separated by $\emptyset$. 
+
+In the above statements, the former nodes are all conditionally independent given the d-separating set. In particular, the only two variables that are unconditionally independent are $Z_1$, $Z_2$.
+
+## Part b
+
+The only conditioning sets used in part a that involve $Z_2$ were for separating $\{Y, Z_1\}$.  It's doesn't appear to me possible to find a d-separating set that doesn't contain $Z_2$. For example, the only way to block the chain $Z_1 \rightarrow Z_3 \rightarrow Y$ is to condition on $Z_3$, which in turn unblocks the path $Z_1 \rightarrow Z_3 \leftarrow Z_2 \rightarrow Y$, which can only be blocked by conditioning on $Z_2$.
+
+## Part c
+
+Two nodes are independent conditional on all other nodes if and only if there is a path between them consisting purely of colliders. 
+
+Conditional on all other nodes:
+
+* $\{W, Z_1\}$ are independent 
+* $\{W, Z_2\}$ are not independent
+* $\{W, Z_3\}$ are not independent
+* $\{X, Y\}$ are independent
+* $\{X, Z_2\}$ are independent
+* $\{Y, Z_1\}$ are independent
+* $\{Z_1, Z_2\}$ are not independent
+
+## Part d
+
+Adjacent nodes cannot be rendered independent, so I'll assume that only non-adjacent nodes are to be rendered independent by conditioning.
+
+* $W$ $X$
+* $X$ $\{W, Z_1, Z_3 \}$
+* $Y$ $\{W, Z_2, Z_3 \}$
+* $Z_1$ $\{ \}$
+* $Z_2$ $\{ \}$
+* $Z_3$ $\{ \}$
+
+## Part e
+
+I originally thought that measuring just the two root nodes, $Z_1$ and $Z_2$ would be sufficient since every other node is a function of those two. However, comparing models via ANOVA suggests otherwise.  
+
+```{r}
+m0 <- lm(y ~ z1 + z2, data = df) 
+m_full <- lm(y ~ w + x + z1 + z2 + z3, data = df) 
+
+anova(m0, m_full)
+```
+
+Since $Y$ is a direct function of $W, Z_2, Z_3$, restricting ourselves to those three measurements would certainly be just as good. ANOVA agrees with us on that one.
+
+```{r}
+m1 <- lm(y ~ w + z2 + z3, data = df) 
+m_full <- lm(y ~ w + x + z1 + z2 + z3, data = df) 
+
+anova(m1, m_full)
+```
+
+Indeed, the coefficients for the remaining variables are not statistically significantly different from 0.
+
+```{r}
+summary(m1)
+```
+
+I'm not sure how to prove that this set of three measurments is minimal though.
+
+## Part f
+
+Although $Z_2$ has no direct causes, it does have direct effects on $Z_3$ and $Y$. 
+
+```{r}
+m_full <- lm(z2 ~ w + x + y + z1 + z3, data = df)
+m0 <- lm(z2 ~ y + z3, data = df)
+
+anova(m0, m_full)
+```
+
+However, the above comparison indicates taht conditioning on just those direct effects is not as good as conditioning on everything. This is due to the fact that $Z_3$ and $Y$ are colliders, which open up information flow between $Z_2$ and $W$, $Z_1$. Adding those two to the conditioning set opens up no new paths to $Z_2$, so we are finished.
+
+```{r}
+m1 <- lm(z2 ~ y + z1 + z3, data = df)
+m2 <- lm(z2 ~ w + y + z1 + z3, data = df)
+
+anova(m0, m1, m2, m_full)
+```
+
+The ANOVA agrees.
+
+## Part g
+
+First of all, the model comparison suggests that the prediction quality does improve if we add $W$.
+
+```{r}
+m0 <- lm(z2 ~ z3, data = df)
+m1 <- lm(z2 ~ z3 + w, data = df)
+
+anova(m0, m1)
+```
+
+This is because conditioning on the collider $Z_3$ opens up the path
+
+$$
+Z_2
+\rightarrow
+Z_3
+\rightarrow
+Z_1
+\rightarrow
+X
+\rightarrow
+W
+$$
+
+which associates $Z_2$ and $W$.
+
