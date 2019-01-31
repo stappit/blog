@@ -3,7 +3,7 @@ title: P is for Pearl
 author: "Brian Callander"
 date: "2019-02-01"
 tags: judea pearl, andrew gelman, mrp, causality, selection bias, confounders, surveys
-tldr: WIP
+tldr: We take a look at Gelman's MRP framework from the perspective of Pearl's causal diagrams in the presence of selection bias. To give this some context, we consider the variables in Gelman & Co's 2014 Xbox Live paper.
 always_allow_html: yes
 output: 
   md_document:
