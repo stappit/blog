@@ -1,9 +1,9 @@
 ---
 title: "CIS Primer Question 2.4.1"
 author: "Brian Callander"
-date: "2019-01-28"
-tags: CISP chapter 2, casual inference, dag, conditional independence
-tldr: Here are my solutions to question 2.3.1 of Causal Inference in Statistics a Primer (CISP).
+date: "2019-02-01"
+tags: CISP chapter 2, casual inference, conditional independence, d-separation
+tldr: Here are my solutions to question 2.4.1 of Causal Inference in Statistics a Primer (CISP).
 always_allow_html: yes
 output: 
   md_document:
@@ -11,7 +11,7 @@ output:
     preserve_yaml: yes
 ---
 
-Here are my solutions to question 2.3.1 of Causal Inference in Statistics: a Primer (CISP).
+Here are my solutions to question 2.4.1 of Causal Inference in Statistics: a Primer (CISP).
 
 <!--more-->
 
@@ -69,6 +69,47 @@ The nodes $\{Z_1, Z_2\}$ are d-separated by $\emptyset$.
 
 In the above statements, the former nodes are all conditionally independent given the d-separating set. In particular, the only two variables that are unconditionally independent are $Z_1$, $Z_2$.
 
+```{r part_a}
+part_a <- list(
+    w_z1 = formula(w ~ 1 + z1 + x),
+    w_z2 = formula(w ~ 1 + z2 + x),
+    w_z3 = formula(w ~ 1 + z3 + x),
+    x_y = formula(x ~ 1 + y + w + z1 + z3),
+    x_z2 = formula(x ~ 1 + z2 + z1 + z3),
+    y_z1 = formula(y ~ 1 + z1 + w + z2 + z3),
+    z1_z2 = formula(z1 ~ 1 + z2)
+  ) %>% 
+  map(lm, df) %>% 
+  map_dfr(broom::tidy, .id = 'model') %>% 
+  separate(model, c('source', 'target'), '_', remove = FALSE) %>% 
+  filter(source == term | target == term) %>%
+  transmute(
+    model,
+    source,
+    target,
+    term,
+    lower = estimate - 2 * std.error, 
+    estimate,
+    upper = estimate + 2 * std.error
+  ) 
+```
+
+```{r part_a_plot, echo=FALSE, fig.cap="Part a: the dependence of each pair conditional on the given d-separation set"}
+part_a %>% 
+  ggplot() +
+  aes(model, ymin = lower, y = estimate, ymax = upper) +
+  geom_hline(yintercept = 0, linetype = 'dashed', colour = 'chocolate') +
+  geom_pointrange()  +
+  coord_flip() +
+  labs(
+    x = 'Pair',
+    y = 'Coefficient',
+    title = 'Dependence of the pair conditional on the given d-separation set'
+  )
+
+```
+
+
 ## Part b
 
 The only conditioning sets used in part a that involve $Z_2$ were for separating $\{Y, Z_1\}$.  It's doesn't appear to me possible to find a d-separating set that doesn't contain $Z_2$. For example, the only way to block the chain $Z_1 \rightarrow Z_3 \rightarrow Y$ is to condition on $Z_3$, which in turn unblocks the path $Z_1 \rightarrow Z_3 \leftarrow Z_2 \rightarrow Y$, which can only be blocked by conditioning on $Z_2$.
@@ -87,41 +128,79 @@ Conditional on all other nodes:
 * $\{Y, Z_1\}$ are independent
 * $\{Z_1, Z_2\}$ are not independent
 
+```{r part_b}
+part_b <- list(
+    w = formula(w ~ 0 + x + y + z1 + z2 + z3),
+    x = formula(x ~ 0 + w + y + z1 + z2 + z3),
+    y = formula(y ~ 0 + w + x + z1 + z2 + z3),
+    z1 = formula(z1 ~ 0 + w + x + y + z2 + z3),
+    z2 = formula(z2 ~ 0 + w + x + y + z1 + z3),
+    z3 = formula(z3 ~ 0 + w + x + y + z1 + z2)
+  ) %>% 
+  map(lm, df) %>% 
+  map_dfr(broom::tidy, .id = 'response') %>% 
+  # filter(term != '(Intercept)') %>%
+  transmute(
+    response,
+    term,
+    lower = estimate - 2 * std.error, 
+    estimate,
+    upper = estimate + 2 * std.error
+  ) 
+```
+
+```{r part_b_plot, echo=FALSE, fig.cap="Part b: each variable regressed on all others"}
+part_b %>% 
+  ggplot() + 
+  aes(term, ymin = lower, y = estimate, ymax = upper, colour = term) +
+  geom_hline(yintercept = 0, linetype = 'dashed', alpha = 0.5) +
+  geom_pointrange(fatten = 0.5) +
+  facet_wrap(~ response) +
+  coord_flip() +
+  labs(
+    x = 'Term',
+    y = 'Estimate',
+    title = 'Each variable regressed on all other variables'
+  ) +
+  guides(colour = FALSE)
+
+```
+
+
 ## Part d
 
-Adjacent nodes cannot be rendered independent, so I'll assume that only non-adjacent nodes are to be rendered independent by conditioning.
+No node can be independent of its parents or children, so the minimal set for each node must include its parents and children. The minimal sets that render each variable independent of all other variables are:
 
-* $W$ $X$
-* $X$ $\{W, Z_1, Z_3 \}$
-* $Y$ $\{W, Z_2, Z_3 \}$
-* $Z_1$ $\{ \}$
-* $Z_2$ $\{ \}$
-* $Z_3$ $\{ \}$
+* $W$: $\{X, Y\}$
+* $X$: $\{W, Z_1, Z_3 \}$
+* $Y$: $\{W, Z_2, Z_3 \}$
+* $Z_1$: $\{ X, Z_2, Z_3 \}$
+* $Z_2$: $\{ W, Y, Z_1, Z_3\}$
+* $Z_3$: $\{ W, X, Y, Z_1, Z_3 \}$
 
 ## Part e
 
 I originally thought that measuring just the two root nodes, $Z_1$ and $Z_2$ would be sufficient since every other node is a function of those two. However, comparing models via ANOVA suggests otherwise.  
 
 ```{r}
-m0 <- lm(y ~ z1 + z2, data = df) 
-m_full <- lm(y ~ w + x + z1 + z2 + z3, data = df) 
+e0 <- lm(y ~ z1 + z2, data = df) 
+e_full <- lm(y ~ w + x + z1 + z2 + z3, data = df) 
 
-anova(m0, m_full)
+anova(e0, e_full)
 ```
 
 Since $Y$ is a direct function of $W, Z_2, Z_3$, restricting ourselves to those three measurements would certainly be just as good. ANOVA agrees with us on that one.
 
 ```{r}
-m1 <- lm(y ~ w + z2 + z3, data = df) 
-m_full <- lm(y ~ w + x + z1 + z2 + z3, data = df) 
+e1 <- lm(y ~ w + z2 + z3, data = df) 
 
-anova(m1, m_full)
+anova(e1, e_full)
 ```
 
 Indeed, the coefficients for the remaining variables are not statistically significantly different from 0.
 
 ```{r}
-summary(m1)
+summary(e1)
 ```
 
 I'm not sure how to prove that this set of three measurments is minimal though.
@@ -131,19 +210,19 @@ I'm not sure how to prove that this set of three measurments is minimal though.
 Although $Z_2$ has no direct causes, it does have direct effects on $Z_3$ and $Y$. 
 
 ```{r}
-m_full <- lm(z2 ~ w + x + y + z1 + z3, data = df)
-m0 <- lm(z2 ~ y + z3, data = df)
+f_full <- lm(z2 ~ w + x + y + z1 + z3, data = df)
+f0 <- lm(z2 ~ y + z3, data = df)
 
-anova(m0, m_full)
+anova(f0, f_full)
 ```
 
-However, the above comparison indicates taht conditioning on just those direct effects is not as good as conditioning on everything. This is due to the fact that $Z_3$ and $Y$ are colliders, which open up information flow between $Z_2$ and $W$, $Z_1$. Adding those two to the conditioning set opens up no new paths to $Z_2$, so we are finished.
+However, the above comparison suggests that conditioning on just those direct effects is not as good as conditioning on everything. This is due to the fact that $Z_3$ and $Y$ are colliders, which open up information flow between $Z_2$ and $W$, $Z_1$. Adding those two to the conditioning set opens up no new paths to $Z_2$, so we are finished.
 
 ```{r}
-m1 <- lm(z2 ~ y + z1 + z3, data = df)
-m2 <- lm(z2 ~ w + y + z1 + z3, data = df)
+f1 <- lm(z2 ~ y + z1 + z3, data = df)
+f2 <- lm(z2 ~ w + y + z1 + z3, data = df)
 
-anova(m0, m1, m2, m_full)
+anova(f0, f1, f2, f_full)
 ```
 
 The ANOVA agrees.
@@ -153,10 +232,10 @@ The ANOVA agrees.
 First of all, the model comparison suggests that the prediction quality does improve if we add $W$.
 
 ```{r}
-m0 <- lm(z2 ~ z3, data = df)
-m1 <- lm(z2 ~ z3 + w, data = df)
+g0 <- lm(z2 ~ z3, data = df)
+g1 <- lm(z2 ~ z3 + w, data = df)
 
-anova(m0, m1)
+anova(g0, g1)
 ```
 
 This is because conditioning on the collider $Z_3$ opens up the path
