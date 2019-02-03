@@ -1,0 +1,206 @@
+---
+title: "BDA3 Chapter 5 Exercise 14"
+author: "Brian Callander"
+date: "2019-02-03"
+tags: bda chapter 3, solutions, gamma-poisson, hierarchical model, stan, unsolved
+tldr: "Here's my solution to exercise 14, chapter 5, of Gelman's Bayesian Data Analysis (BDA), 3rd edition."
+always_allow_html: yes
+output: 
+  md_document:
+    variant: markdown
+    preserve_yaml: yes
+---
+
+Here's my solution to exercise 14, chapter 5, of [Gelman's](https://andrewgelman.com/) *Bayesian Data Analysis* (BDA), 3rd edition. There are [solutions](http://www.stat.columbia.edu/~gelman/book/solutions.pdf) to some of the exercises on the [book's webpage](http://www.stat.columbia.edu/~gelman/book/).
+
+<!--more-->
+
+<div style="display:none">
+  $\DeclareMathOperator{\dbinomial}{Binomial}
+   \DeclareMathOperator{\dbern}{Bernoulli}
+   \DeclareMathOperator{\dpois}{Poisson}
+   \DeclareMathOperator{\dnorm}{Normal}
+   \DeclareMathOperator{\dt}{t}
+   \DeclareMathOperator{\dcauchy}{Cauchy}
+   \DeclareMathOperator{\dexponential}{Exp}
+   \DeclareMathOperator{\duniform}{Uniform}
+   \DeclareMathOperator{\dgamma}{Gamma}
+   \DeclareMathOperator{\dinvgamma}{InvGamma}
+   \DeclareMathOperator{\invlogit}{InvLogit}
+   \DeclareMathOperator{\logit}{Logit}
+   \DeclareMathOperator{\ddirichlet}{Dirichlet}
+   \DeclareMathOperator{\dbeta}{Beta}$
+</div>
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(
+  echo = TRUE,
+  comment = NA,
+  message = FALSE,
+  warning = FALSE,
+  error = TRUE,
+  # cache = TRUE,
+  dev = "svglite"
+)
+
+library(tidyverse)
+library(scales)
+library(kableExtra)
+
+library(rstan)
+library(tidybayes)
+
+rstan_options(auto_write = TRUE)
+options(mc.cores = parallel::detectCores())
+
+theme_set(theme_bw())
+
+```
+
+We'll use the same dataset as before but only use the total traffic counts.
+
+```{r data}
+df <- read_csv('data/chapter_03_exercise_08.csv') %>% 
+  filter(type == 'residential' & bike_route) %>% 
+  transmute(
+    i = 1:n(),
+    total = bikes + other
+  )
+```
+
+```{r data_table, echo=FALSE}
+df %>% 
+  kable() %>% 
+  kable_styling(bootstrap_options = c("striped", "hover", "responsive"))
+```
+
+The hyperprior from [exercise 13](./chapter_05_exercise_13.html) was given by $p(\alpha, \beta) \propto (\alpha, \beta)^{-\frac{5}{2}}$, but where $\alpha, \beta$ were used as parameters in the beta distribution. As a first attempt, we'll try using the same priors for our gamma distribution. Since the support is the same for each, this at least makes some sense. 
+
+The joint posterior is 
+
+$$
+\begin{align}
+  p(\alpha, \beta, \theta \mid y)
+  &=
+  p(\alpha, \beta)
+  \cdot
+  \prod_{j = 1}^J 
+  p(\theta_j \mid \alpha, \beta)
+  \cdot
+  p(y_j \mid \theta_j)
+  \\
+  &=
+  (\alpha + \beta)^{-\frac{5}{2}}
+  \prod_{j = 1}^J 
+  \frac{\beta^\alpha}{\Gamma(\alpha)}
+  \theta_j^{\alpha - 1}
+  e^{-\beta \theta_j}
+  \theta_j^{y_j}
+  e^{-\theta_j}
+  \\
+  &=
+  (\alpha + \beta)^{-\frac{5}{2}}
+  \frac{\beta^{J\alpha}}{\Gamma(\alpha)^J}
+  e^{-(\beta + 1) \sum \theta_j}
+  \prod_{j = 1}^J 
+  \theta_j^{y_j + \alpha - 1}
+  .
+\end{align}
+$$
+
+I have no idea if it has a finite integral, so we'll just use this for the rest of the exercise.
+
+Here's the model definition in stan.
+
+```{r model}
+model <- rstan::stan_model('src/ex_05_14.stan')
+```
+
+```{r model_code, echo=FALSE}
+model
+```
+
+The model can be fit using some [tidybayes](https://mjskay.github.io/tidybayes/articles/tidybayes.html) helpers.
+
+```{r fit, results='hide'}
+fit <- model %>% 
+  rstan::sampling(
+    data = tidybayes::compose_data(df),
+    warmup = 1000,
+    iter = 5000
+  ) %>% 
+  tidybayes::recover_types(df)
+```
+
+
+Now draw samples from the posterior.
+
+```{r draws}
+draws <- fit %>% 
+  tidybayes::spread_draws(alpha, beta, theta[i]) 
+```
+
+The posterior joint distribution of $\alpha, \beta$ looks fairly reasonable. It's concentrated along the diagonal where $\beta \approx \alpha / 100$, and mainly around $\alpha \approx 2.5$, $\beta \approx 0.025$.
+
+```{r posterior_alpha_beta_plot, echo=FALSE, fig.cap="Posterior joint density of α, β."}
+draws %>% 
+  ungroup() %>% 
+  distinct(.draw, .keep_all = TRUE) %>% 
+  as_tibble() %>% 
+  ggplot() +
+  aes(alpha, beta) +
+  geom_hex(aes(colour = ..count..)) +
+  labs(
+    x = 'α',
+    y = 'β',
+    title = 'Posterior joint marginal density of α and β'
+  ) +
+  NULL
+
+```
+
+There is little deviation between the observed and estimated values.
+
+```{r estimated_vs_observed_plot, echo=FALSE, fig.cap="Posterior medians and 95% intervals of traffic based on simulations from the joint posterior distribution."}
+draws %>%
+  median_qi() %>% 
+  select(i, contains('theta')) %>% 
+  inner_join(df, by = 'i') %>% 
+  ggplot() +
+  aes(total, ymin = theta.lower, y = theta, ymax = theta.upper) +
+  geom_abline(intercept = 0, slope = 1, linetype = 'dashed', colour = 'chocolate') +
+  geom_pointrange() +
+  # scale_x_continuous(limits = c(0, NA)) +
+  # scale_y_continuous(limits = c(0, NA)) +
+  labs(
+    x = 'Observed total traffic',
+    y = 'Estimated θ',
+    title = "Comparison of estimated parameters with observed data"
+  ) +
+  NULL
+```
+
+To estimate total traffic for an unobserved street, we draw $\alpha, \beta$ from the posterior, draw $\theta \sim \dgamma(\alpha, \beta)$, then draw $\tilde y \sim \dpois(\theta)$. The quantiles of $\tilde y$ are then our posterior predictive interval.
+
+```{r cis}
+cis <- draws %>% 
+  filter(i == 1) %>% 
+  mutate(
+    theta = rgamma(n(), alpha, beta),
+    y = rpois(n(), theta)
+  ) %>% 
+  tidybayes::median_qi() %>% 
+  select(matches('y|theta'))
+```
+
+```{r hits, include=FALSE}
+hits <- df %>% 
+  crossing(cis) %>% 
+  transmute(
+    y_hit = y.lower <= total & total <= y.upper
+  ) %>% 
+  summarise_all(sum)
+  
+```
+
+The 95% posterior interval for $\tilde\theta$ is (`r cis %>% pull(theta.lower) %>% round()`, `r cis %>% pull(theta.upper) %>% round()`). The 95% posterior interval of $\tilde y$ is (`r cis %>% pull(y.lower) %>% round()`, `r cis %>% pull(y.upper) %>% round()`), which includes `r hits %>% pull(y_hit)` of the 10 observed values. 
