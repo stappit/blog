@@ -6,7 +6,7 @@ output:
   md_document:
     preserve_yaml: True
     variant: markdown
-tags: 'bda chapter 3, solutions'
+tags: 'bda chapter 3, solutions, beta-binomial, hierarchical model, stan'
 title: BDA3 Chapter 5 Exercise 13
 tldr: |
     Here's my solution to exercise 13, chapter 5, of Gelman's Bayesian Data
@@ -246,10 +246,6 @@ Here is the [model code](src/ex_05_13.stan):
 model <- rstan::stan_model('src/ex_05_13.stan')
 ```
 
-    DIAGNOSTIC(S) FROM PARSER:
-    Info (non-fatal): Comments beginning with # are deprecated.  Please use // in place of # for line comments.
-    Info (non-fatal): Comments beginning with # are deprecated.  Please use // in place of # for line comments.
-
     S4 class stanmodel 'ex_05_13' coded as follows:
     data {
       int<lower = 1> n;
@@ -267,9 +263,9 @@ model <- rstan::stan_model('src/ex_05_13.stan')
       // joint prior on alpha, beta
       target += -(5. / 2.) * log(alpha + beta); 
       // theta prior
-      theta ~ beta(alpha, beta); # theta prior
+      theta ~ beta(alpha, beta); 
       // likelihood
-      bikes ~ binomial(total, theta); # likelihood
+      bikes ~ binomial(total, theta); 
     } 
 
 Now we calculate the posterior, using
@@ -290,7 +286,7 @@ Now we can draw some samples from the posterior.
 
 ``` {.r}
 draws <- fit %>% 
-  spread_draws(alpha, beta, theta[i]) 
+  tidybayes::spread_draws(alpha, beta, theta[i]) 
 ```
 
 ![Contour plot of the marginal posterior density of (log(α/β), log(α +
@@ -328,9 +324,9 @@ cis <- draws %>%
   select(matches('y|theta')) 
 ```
 
-The 95% posterior interval for $\tilde\theta$ is (3.44%, 47.7%), which
+The 95% posterior interval for $\tilde\theta$ is (3.44%, 47.3%), which
 includes 10 of the 10 observed rates. The 95% posterior interval of
-$\tilde y$ is (3, 49), which includes 9 of the 10 observed values. These
+$\tilde y$ is (3, 48), which includes 9 of the 10 observed values. These
 intervals seem reasonable, although they are fairly wide. It's difficult
 to make a statement about how useful these could be in application
 without a concrete idea of what that application is.

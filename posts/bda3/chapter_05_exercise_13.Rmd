@@ -2,7 +2,7 @@
 title: "BDA3 Chapter 5 Exercise 13"
 author: "Brian Callander"
 date: "2019-02-03"
-tags: bda chapter 3, solutions
+tags: bda chapter 3, solutions, beta-binomial, hierarchical model, stan
 tldr: "Here's my solution to exercise 13, chapter 5, of Gelman's Bayesian Data Analysis (BDA), 3rd edition."
 always_allow_html: yes
 output: 
@@ -160,6 +160,6 @@ hits <- df %>%
   
 ```
 
-The 95% posterior interval for $\tilde\theta$ is (`r cis %>% pull(theta.lower) %>% percent()`, `r cis %>% pull(theta.upper) %>% percent`), which includes `r hits %>% pull(theta_hit)` of the 10 observed rates. The 95% posterior interval of $\tilde y$ is (`r cis %>% pull(y.lower)`, `r cis %>% pull(y.upper)`), which includes `r hits %>% pull(y_hit)` of the 10 observed values. These intervals seem reasonable, although they are fairly wide. It's difficult to make a statement about how useful these could be in application without a concrete idea of what that application is.
+The 95% posterior interval for $\tilde\theta$ is (`r cis %>% pull(theta.lower) %>% percent()`, `r cis %>% pull(theta.upper) %>% percent`), which includes `r hits %>% pull(theta_hit)` of the 10 observed rates. The 95% posterior interval of $\tilde y$ is (`r cis %>% pull(y.lower) %>% comma()`, `r cis %>% pull(y.upper) %>% comma()`), which includes `r hits %>% pull(y_hit)` of the 10 observed values. These intervals seem reasonable, although they are fairly wide. It's difficult to make a statement about how useful these could be in application without a concrete idea of what that application is.
 
 
