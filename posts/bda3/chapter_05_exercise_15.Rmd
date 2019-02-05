@@ -1,0 +1,213 @@
+---
+title: "BDA3 Chapter 5 Exercise 15"
+author: "Brian Callander"
+date: "2019-02-05"
+tags: bda chapter 3, solutions, normal, hierarchical model, posterior predictive distribution
+tldr: "Here's my solution to exercise 15, chapter 5, of Gelman's Bayesian Data Analysis (BDA), 3rd edition."
+always_allow_html: yes
+output: 
+  md_document:
+    variant: markdown
+    preserve_yaml: yes
+---
+
+Here's my solution to exercise 15, chapter 5, of [Gelman's](https://andrewgelman.com/) *Bayesian Data Analysis* (BDA), 3rd edition. There are [solutions](http://www.stat.columbia.edu/~gelman/book/solutions.pdf) to some of the exercises on the [book's webpage](http://www.stat.columbia.edu/~gelman/book/).
+
+<!--more-->
+
+<div style="display:none">
+  $\DeclareMathOperator{\dbinomial}{Binomial}
+   \DeclareMathOperator{\dbern}{Bernoulli}
+   \DeclareMathOperator{\dpois}{Poisson}
+   \DeclareMathOperator{\dnorm}{Normal}
+   \DeclareMathOperator{\dt}{t}
+   \DeclareMathOperator{\dcauchy}{Cauchy}
+   \DeclareMathOperator{\dexponential}{Exp}
+   \DeclareMathOperator{\duniform}{Uniform}
+   \DeclareMathOperator{\dgamma}{Gamma}
+   \DeclareMathOperator{\dinvgamma}{InvGamma}
+   \DeclareMathOperator{\invlogit}{InvLogit}
+   \DeclareMathOperator{\logit}{Logit}
+   \DeclareMathOperator{\ddirichlet}{Dirichlet}
+   \DeclareMathOperator{\dbeta}{Beta}$
+</div>
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(
+  echo = TRUE,
+  comment = NA,
+  message = FALSE,
+  warning = FALSE,
+  error = TRUE,
+  # cache = TRUE,
+  dev = "svglite"
+)
+
+library(tidyverse)
+library(scales)
+library(kableExtra)
+
+library(rstan)
+library(tidybayes)
+
+rstan_options(auto_write = TRUE)
+options(mc.cores = parallel::detectCores())
+
+theme_set(theme_bw())
+
+```
+
+The [data provided](http://www.stat.columbia.edu/~gelman/book/data/meta.asc) are in an awkward format. I've [downloaded it](data/chapter_05_exercise_15_table_5.4.txt) with minor modifications to make it easier to parse.
+
+```{r data}
+df <- read_delim(
+    'data/chapter_05_exercise_15_table_5.4.txt', 
+    delim=' ',
+    skip=4,
+    trim_ws=TRUE
+  ) %>% 
+  transmute(
+    study,
+    y = log(treated.deaths / (treated.total - treated.deaths)) - log(control.deaths / (control.total - control.deaths)),
+    sigma2 = (1 / treated.deaths) + (1 / (treated.total - treated.deaths)) + (1 / control.deaths) + (1 / (control.total - control.deaths)),
+    sigma = sqrt(sigma2),
+    n = treated.total + control.total
+  ) %>% 
+  select(-sigma2)
+
+```
+
+```{r data_table, echo=FALSE}
+df %>% 
+  kable(caption = "The meta-analysis data from table 5.4, page 124.") %>% 
+  kable_styling(bootstrap_options = c("striped", "hover", "responsive"))
+
+```
+
+We'll use the model described in the book. Note that by not explicitly giving a prior for $\mu$ or $\tau$, stan gives them a uniform prior.
+
+```{r model, results='hide'}
+model <- rstan::stan_model('src/ex_05_15.stan')
+```
+
+```{r model_code, echo=FALSE}
+model
+```
+
+Let's fit the model.
+
+```{r fit}
+set.seed(57197)
+
+fit <- model %>% 
+  sampling(
+    data = tidybayes::compose_data(df),
+    warmup = 1000,
+    iter = 5000
+  )
+```
+
+We'll draw the posterior population parameters separately from the study parameters purely for convenience.
+
+```{r draws}
+pop_params <- fit %>% 
+  tidybayes::spread_draws(mu, tau)
+
+draws <- fit %>% 
+  tidybayes::spread_draws(mu, tau, theta[study])
+```
+
+
+The population standard deviation $\tau$ has most of its mass below 0.4.
+
+```{r tau_plot, echo=FALSE, fig.cap="A histogram of the posterior draws for τ."}
+pop_params %>% 
+  ggplot() +
+  aes(tau) +
+  geom_histogram() +
+  labs(
+    x = 'τ',
+    y = 'Count',
+    title = 'Posterior of τ'
+  )
+```
+
+As in figure 5.6, the effect estimates are almost identical for $\tau \approx 0$ and spread out as $\tau$ increases.
+
+```{r theta_vs_tau, echo=FALSE, fig.cap="Conditional posterior means of treatment effects E(θ | τ, y), as functions of the between-study standard deviation τ."}
+draws %>% 
+  ggplot() +
+  aes(tau, theta, colour = ordered(study)) +
+  geom_smooth(se=FALSE) +
+  labs(
+    x = 'τ',
+    y = 'θ',
+    title = 'Estimated effect as a function of the standard deviation',
+    subtitle = 'We use smooths of the posterior draws',
+    colour = 'Study'
+  )
+  
+```
+
+Let's get the median effect estimates with 95% posterior intervals. The low sample size estimates (dark dots) remain close to the population mean ($\mu$), whereas the larger sample size estimates (light dots) can move closer to the unpooled estimates (dotted line).
+
+```{r cis}
+cis <- draws %>% 
+  median_qi() %>% 
+  inner_join(df, by = 'study')
+```
+
+
+```{r cis_plot, echo=FALSE, fig.cap="Comparison of the crude effect estimates with the posterior median effects."}
+cis %>% 
+  ggplot() +
+  aes(x = y) +
+  geom_abline(slope = 1, intercept = 0, linetype = 'dotted', colour = 'black') +
+  geom_ribbon(aes(ymin = mu.lower, ymax = mu.upper), alpha = 0.3, colour = NA, fill = 'chocolate') +
+  geom_hline(yintercept = cis$mu, linetype = 'dashed', colour = 'chocolate') +
+  geom_pointrange(aes(x = y, ymin = theta.lower, y = theta, ymax = theta.upper, colour = log(n))) +
+  labs(
+    x = 'Crude effect estimate, y',
+    y = 'Posterior median effect, θ',
+    title = 'Crude effect estimates vs. posterior median effect estimates',
+    subtitle = paste(
+      'The orange band is a 95% credible interval for μ',
+      'The dotted line corresponds to the unpooled estimates',
+      sep = '\n'
+    ),
+    colour = 'log(sample size)'
+  )
+```
+
+To estimate an effect for a new study, we draw $\theta \sim \dnorm(\mu, \tau)$.
+
+```{r new_theta}
+new_theta <- pop_params %>% 
+  mutate(theta = rnorm(n(), mu, tau)) 
+```
+
+```{r new_study_positive}
+prob_new_theta_positive <- new_theta %>% 
+  summarise(sum(theta > 0) / n()) %>% 
+  pull() 
+  
+```
+
+It has a `r prob_new_theta_positive %>% percent()` probability of being positive.
+
+```{r new_theta_plot, echo=FALSE, fig.cap='Posterior simulations of a new treatment effect.'}
+new_theta %>% 
+  ggplot() +
+  aes(theta) +
+  geom_histogram() +
+  geom_vline(xintercept = 0, linetype = 'dashed', colour = 'chocolate') +
+  labs(
+    x = 'θ',
+    y = 'Count',
+    title = 'Posterior simulations of a new treatment effect',
+    subtitle = str_glue('There is a {percent(prob_new_theta_positive)} posterior probability that θ > 0')
+  )
+  
+
+```
+
