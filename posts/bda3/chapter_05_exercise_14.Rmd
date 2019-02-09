@@ -2,7 +2,7 @@
 title: "BDA3 Chapter 5 Exercise 14"
 author: "Brian Callander"
 date: "2019-02-03"
-tags: bda chapter 3, solutions, gamma-poisson, hierarchical model, stan, unsolved
+tags: bda chapter 5, solutions, gamma-poisson, hierarchical model, stan, unsolved
 tldr: "Here's my solution to exercise 14, chapter 5, of Gelman's Bayesian Data Analysis (BDA), 3rd edition."
 always_allow_html: yes
 output: 

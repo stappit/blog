@@ -6,7 +6,7 @@ output:
   md_document:
     preserve_yaml: True
     variant: markdown
-tags: 'bda chapter 3, solutions, beta-binomial, hierarchical model, stan'
+tags: 'bda chapter 5, solutions, beta-binomial, hierarchical model, stan'
 title: BDA3 Chapter 5 Exercise 13
 tldr: |
     Here's my solution to exercise 13, chapter 5, of Gelman's Bayesian Data
@@ -324,9 +324,9 @@ cis <- draws %>%
   select(matches('y|theta')) 
 ```
 
-The 95% posterior interval for $\tilde\theta$ is (3.44%, 47.3%), which
+The 95% posterior interval for $\tilde\theta$ is (3.65%, 49.1%), which
 includes 10 of the 10 observed rates. The 95% posterior interval of
-$\tilde y$ is (3, 48), which includes 9 of the 10 observed values. These
-intervals seem reasonable, although they are fairly wide. It's difficult
-to make a statement about how useful these could be in application
-without a concrete idea of what that application is.
+$\tilde y$ is (3, 49.025), which includes 9 of the 10 observed values.
+These intervals seem reasonable, although they are fairly wide. It's
+difficult to make a statement about how useful these could be in
+application without a concrete idea of what that application is.
