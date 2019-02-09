@@ -2,7 +2,7 @@
 title: "BDA3 Chapter 5 Exercise 15"
 author: "Brian Callander"
 date: "2019-02-05"
-tags: bda chapter 3, solutions, normal, hierarchical model, posterior predictive distribution
+tags: bda chapter 5, solutions, normal, hierarchical model, posterior predictive distribution
 tldr: "Here's my solution to exercise 15, chapter 5, of Gelman's Bayesian Data Analysis (BDA), 3rd edition."
 always_allow_html: yes
 output: 

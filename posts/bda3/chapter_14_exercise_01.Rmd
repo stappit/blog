@@ -1,0 +1,244 @@
+---
+title: "BDA3 Chapter 14 Exercise 1"
+author: "Brian Callander"
+date: "2019-02-09"
+tags: bda chapter 14, solutions, brms, linear regression, radon
+tldr: "Here's my solution to exercise 1, chapter 14, of Gelman's Bayesian Data Analysis (BDA), 3rd edition."
+always_allow_html: yes
+output: 
+  md_document:
+    variant: markdown
+    preserve_yaml: yes
+---
+
+Here's my solution to exercise 1, chapter 14, of [Gelman's](https://andrewgelman.com/) *Bayesian Data Analysis* (BDA), 3rd edition. There are [solutions](http://www.stat.columbia.edu/~gelman/book/solutions.pdf) to some of the exercises on the [book's webpage](http://www.stat.columbia.edu/~gelman/book/).
+
+<!--more-->
+
+<div style="display:none">
+  $\DeclareMathOperator{\dbinomial}{Binomial}
+   \DeclareMathOperator{\dbern}{Bernoulli}
+   \DeclareMathOperator{\dpois}{Poisson}
+   \DeclareMathOperator{\dnorm}{Normal}
+   \DeclareMathOperator{\dt}{t}
+   \DeclareMathOperator{\dcauchy}{Cauchy}
+   \DeclareMathOperator{\dexponential}{Exp}
+   \DeclareMathOperator{\duniform}{Uniform}
+   \DeclareMathOperator{\dgamma}{Gamma}
+   \DeclareMathOperator{\dinvgamma}{InvGamma}
+   \DeclareMathOperator{\invlogit}{InvLogit}
+   \DeclareMathOperator{\logit}{Logit}
+   \DeclareMathOperator{\ddirichlet}{Dirichlet}
+   \DeclareMathOperator{\dbeta}{Beta}$
+</div>
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(
+  echo = TRUE,
+  comment = NA,
+  message = FALSE,
+  warning = FALSE,
+  error = TRUE,
+  # cache = TRUE,
+  dev = "svglite"
+)
+
+library(tidyverse)
+library(scales)
+library(kableExtra)
+
+library(rstan)
+library(brms)
+library(tidybayes)
+
+rstan_options(auto_write = TRUE)
+options(mc.cores = parallel::detectCores())
+
+theme_set(theme_bw())
+
+```
+
+```{r write_data, include=FALSE}
+radon <- list(
+  "Blue Earth" = list(
+    'radon_pCiL' = c(5, 13, 7.2, 6.8, 12.8, 5.8, 9.5, 6, 3.8, 14.3, 1.8, 6.9, 4.7, 9.5),
+    'basement' = c(rep(TRUE, 5), FALSE, rep(TRUE, 3), FALSE, rep(TRUE, 4))
+  ),
+  "Clay" = list(
+    'radon_pCiL' = c(0.9, 12.9, 2.6, 3.5, 26.6, 1.5, 13.0, 8.8, 19.5, 2.5, 9, 13.1, 3.6, 6.9),
+    'basement' = c(FALSE, TRUE, TRUE, FALSE, rep(TRUE, 5), FALSE, rep(TRUE, 3), FALSE)
+  ),
+  "Goodhue" = list(
+    'radon_pCiL' = c(14.3, 6.9, 7.6, 9.8, 2.6, 43.5, 4.9, 3.5, 4.8, 5.6, 3.5, 3.9, 6.7),
+    'basement' = c(TRUE, FALSE, TRUE, FALSE, rep(TRUE, 9))
+  )
+)
+
+df <- radon %>% 
+  map_dfr(as_tibble, .id = 'county') %>% 
+  write_csv('data/chapter_07_exercise_06_radon.csv')
+  
+df
+```
+
+We are given the following data and asked to fit a linear regression to the log-radon measurements.
+
+```{r data}
+df <- read_csv('data/chapter_07_exercise_06_radon.csv')
+```
+
+```{r data_table, echo=FALSE}
+df %>% 
+  head(5) %>% 
+  kable(caption = 'Table 7.3 from page 195 (sample)') %>% 
+  kable_styling(bootstrap_options = c("striped", "hover", "responsive"))
+```
+
+On the log scale, the measurements vary mostly between 0 and 4.
+
+```{r radon_plot, echo=FALSE}
+df %>% 
+  ggplot() +
+  aes(log(radon_pCiL)) +
+  geom_histogram() +
+  labs(
+    x = 'log(pCi/L)',
+    y = 'Count',
+    title = 'Histogram of log-radon measurements'
+  )
+
+```
+
+I'll take this opportunity to play around with [`brms`](https://rdrr.io/cran/brms/), a powerful package for working with [stan](https://mc-stan.org/) models. It took me a while to get familiar with the notation for specifying priors. The `get_prior` function is useful to check what you can put priors on, whilst also displaying the defaults.
+
+```{r get_prior}
+p <- get_prior(
+  log(radon_pCiL) ~ 0 + county + basement,
+  df
+)
+```
+
+```{r get_prior_table, echo=FALSE}
+p %>% 
+  select(prior, class, coef) %>% 
+  kable(caption = 'Output from the `get_prior` function. Some columns are not shown.') %>% 
+  kable_styling(bootstrap_options = c("striped", "hover", "responsive"))
+```
+
+For our example, there are two classes: `b` and `sigma`. The former is for the regression coefficients and the latter for the measurement error. The default prior on the coefficients is a uniform prior (stan's default) since the entries under the `prior` column are all empty. The `sigma` parameter gets a t-distribution by default (with 3 degrees of freedom).
+
+We can put the same prior on each of the parameters of class `b` by only specifying the class in the `prior` function:
+
+```{r my_prior}
+my_prior <- c(
+  prior(normal(0, 10), class = 'b'),
+  prior(scaled_inv_chi_square(1, 1), class = 'sigma')
+)
+```
+
+```{r my_prior_table, echo=FALSE}
+my_prior %>% 
+  select(prior, class, coef) %>% 
+  kable(caption = 'Details of my prior. Some columns are not shown.') %>% 
+  kable_styling(bootstrap_options = c("striped", "hover", "responsive"))
+```
+
+We have given all coefficients a $\dnorm(0, 10)$ prior, and the `sigma` prior a scaled inverse chi squared prior. By adding in the `coef` argument into the `prior` function, we could specify priors for each of the different coefficients individually. For example, the following is equivalent to `my_prior`.
+
+
+```{r my_prior_alt}
+my_prior_alt <- c(
+  prior(normal(0, 10), class = 'b', coef = 'basementTRUE'),
+  prior(normal(0, 10), class = 'b', coef = 'countyBlueEarth'),
+  prior(normal(0, 10), class = 'b', coef = 'countyGoodhue'),
+  prior(normal(0, 10), class = 'b', coef = 'countyClay'),
+  prior(scaled_inv_chi_square(1, 1), class = 'sigma')
+)
+```
+
+```{r my_prior_alt_table, echo=FALSE}
+my_prior_alt %>% 
+  select(prior, class, coef) %>% 
+  kable(caption = 'Equivalent specification of my prior. Some columns are not shown.') %>% 
+  kable_styling(bootstrap_options = c("striped", "hover", "responsive"))
+```
+
+
+Apparently, specifying just a class prior (instead of each coefficient individually) allows brms to better take advantage of vectorisation. Since vectorisation often results in faster sampling, we'll stick with the first specification.
+
+Fitting the model works as you'd expect. We'll supress the stan output.
+
+```{r fit, results='hide'}
+set.seed(32060)
+
+fit <- brms::brm(
+  log(radon_pCiL) ~ 0 + county + basement,
+  data = df,
+  prior = my_prior
+)
+```
+
+The summary displays some general information about the model, together with parameter estimates and some sampling diagnostics (rhat and effective sample size).
+
+```{r fit_summary}
+summary(fit, priors = TRUE)
+```
+
+The estimates for log-radon levels in each county are approximately the same. Basement measurements have higher radon levels but it's not clear from this dataset that this effect is not just noise. The prediction error (`sigma`) is fairly large in relation to the coefficient estimates.
+
+We can also get plots of the marginal effects from brms.
+
+```{r marginal_effects}
+ps <- fit %>% 
+  brms::marginal_effects() %>% 
+  plot(ask=FALSE, plot=FALSE)
+```
+
+```{r marginal_effects_plot, echo=FALSE}
+ps[[1]] +
+  labs(
+    x = 'County',
+    y = 'log(pCi/L)',
+    title = 'Log(radon) estimates by country',
+    subtitle = 'For first-floor measurements'
+  ) +
+  coord_flip()
+
+ps[[2]] +
+  labs(
+    x = 'Basement measurement?',
+    y = 'log(pCi/L)',
+    title = 'Effect of measurement location',
+    subtitle = 'For Blue Earth county'
+  ) +
+  coord_flip()
+
+```
+
+The [tidybayes](https://mjskay.github.io/tidybayes/) package is useful for posterior predictive distributions via [`add_predicted_draws`](https://rdrr.io/cran/tidybayes/man/add_predicted_draws.html). Note that it is important to transform the radon estimates to the observation scale before calculating the posterior intervals.
+
+```{r posterior_predictive}
+pp <- crossing(
+    county = 'Blue Earth',
+    basement = c(FALSE, TRUE)
+  ) %>% 
+  tidybayes::add_predicted_draws(fit) %>% 
+  mutate(radon = exp(.prediction)) %>% 
+  tidybayes::median_qi() 
+```
+
+```{r posterior_predictive_plot, echo=FALSE}
+pp %>% 
+  ggplot() +
+  aes(basement, radon, ymin = radon.lower, ymax = radon.upper) +
+  geom_pointrange() +
+  labs(
+    x = 'Basement measurement?',
+    y = 'Radon (pCi/L)',
+    title = 'Posterior predictive distribution for a random house in Blue Earth county',
+    subtitle = 'with 5%, 50%, and 95% posterior intervals'
+  ) +
+  coord_flip()
+
+```
+

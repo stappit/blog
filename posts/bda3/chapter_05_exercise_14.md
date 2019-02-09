@@ -7,7 +7,7 @@ output:
     preserve_yaml: True
     variant: markdown
 tags: |
-    bda chapter 3, solutions, gamma-poisson, hierarchical model, stan,
+    bda chapter 5, solutions, gamma-poisson, hierarchical model, stan,
     unsolved
 title: BDA3 Chapter 5 Exercise 14
 tldr: |
@@ -256,6 +256,6 @@ cis <- draws %>%
   select(matches('y|theta'))
 ```
 
-The 95% posterior interval for $\tilde\theta$ is (20, 290). The 95%
-posterior interval of $\tilde y$ is (19, 292), which includes 9 of the
+The 95% posterior interval for $\tilde\theta$ is (19, 295). The 95%
+posterior interval of $\tilde y$ is (19, 298), which includes 9 of the
 10 observed values.

@@ -7,7 +7,7 @@ output:
     preserve_yaml: True
     variant: markdown
 tags: |
-    bda chapter 3, solutions, normal, hierarchical model, posterior
+    bda chapter 5, solutions, normal, hierarchical model, posterior
     predictive distribution
 title: BDA3 Chapter 5 Exercise 15
 tldr: |
