@@ -1,0 +1,206 @@
+---
+title: "CIS Primer Question 3.2.1"
+author: "Brian Callander"
+date: "2019-02-10"
+tags: CISP chapter 3, solutions, ace, risk difference, simpsons reversal
+tldr: Here are my solutions to question 3.2.1 of Causal Inference in Statistics a Primer (CISP).
+always_allow_html: yes
+output: 
+  md_document:
+    variant: markdown
+    preserve_yaml: yes
+---
+
+Here are my solutions to question 3.2.1 of Causal Inference in Statistics: a Primer (CISP). 
+
+<!--more-->
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(
+  echo = TRUE,
+  comment = NA,
+  message = FALSE,
+  warning = FALSE,
+  error = TRUE,
+  # cache = TRUE,
+  dev = "svglite"
+)
+
+library(tidyverse)
+library(scales)
+library(kableExtra)
+library(colorspace)
+
+theme_set(theme_bw())
+ 
+```
+
+Here are the parameters we'll use. Note that they are taken from the Simpson's revesal example of [question 1.5.2](question_1_5_2.html).
+
+```{r params}
+r	<- 0.28   # fraction with syndrome
+
+q0 <- 0.07  # P(X = 1 | Z = 0)
+q1 <- 0.85  # P(X = 1 | Z = 1)
+             
+p00 <- 0.84 # P(Y = 1 | X = 0, Z = 0)
+p10 <- 0.88 # P(Y = 1 | X = 1, Z = 0)
+p01 <- 0.53 # P(Y = 1 | X = 0, Z = 1)
+p11 <- 0.58 # P(Y = 1 | X = 1, Z = 1)
+```
+
+## Part a
+
+We can simulate the intervention by generating values for $X$ independently of $Z$.
+
+```{r data_a}
+N <- 10000  # number of individuals
+
+set.seed(53201)
+
+part_a <- tibble(z = rbinom(N, 1, r)) %>% 
+  mutate(
+    x = rbinom(n(), 1, 0.5), # no Z-dependence
+    p_y_given_x_z = case_when(
+      x == 0 & z == 0 ~ p00,
+      x == 0 & z == 1 ~ p01,
+      x == 1 & z == 0 ~ p10,
+      x == 1 & z == 1 ~ p11
+    ),
+    y = rbinom(n(), 1, p_y_given_x_z)
+  ) %>% 
+  group_by(x, y) %>% 
+  summarise(n = n()) %>% 
+  group_by(x) %>% 
+  mutate(p_y_given_do_x = n / sum(n))
+
+```
+
+```{r data_a_table, echo=FALSE}
+part_a %>% 
+  kable() %>% 
+  kable_styling(bootstrap_options = c('hover', 'striped', 'responsive'))
+```
+
+
+## Part b
+
+To simulate observational data, we need to include the dependence of $X$ on $Z$.
+
+```{r data_b}
+N <- 100000  # number of individuals
+
+set.seed(95400)
+
+p_x_y_z <- tibble(
+    id = 1:N,
+    
+    z = rbinom(N, 1, r),
+    x = rbinom(N, 1, if_else(z == 0, q0, q1)),
+    
+    p_y_given_x_z = case_when(
+      x == 0 & z == 0 ~ p00,
+      x == 0 & z == 1 ~ p01,
+      x == 1 & z == 0 ~ p10,
+      x == 1 & z == 1 ~ p11
+    ),
+    
+    y = rbinom(N, 1, p_y_given_x_z)
+  ) %>% 
+  group_by(x, y, z) %>% 
+  count() %>% 
+  ungroup() %>% 
+  mutate(p = n / sum(n))
+
+```
+
+
+```{r p_x_y_z_table, echo=FALSE}
+p_x_y_z %>% 
+  kable() %>% 
+  kable_styling(bootstrap_options = c('hover', 'striped', 'responsive'))
+```
+
+In order to apply the causal effect rule, we'll need $\mathbb P(x \mid z)$.
+
+```{r p_x_given_z}
+p_x_given_z <- p_x_y_z %>% 
+  group_by(x, z) %>% 
+  summarise(n = sum(n)) %>% 
+  group_by(z) %>% 
+  mutate(p = n / sum(n)) %>% 
+  ungroup()
+```
+
+
+```{r p_x_given_z_table, echo=FALSE}
+p_x_given_z %>% 
+  kable() %>% 
+  kable_styling(bootstrap_options = c('hover', 'striped', 'responsive'))
+```
+
+We can then add the conditional probabilities to the joint distribution table, then sum overal all the $Z$ variables.
+
+```{r p_y_given_do_x}
+p_y_given_do_x <- p_x_y_z %>% 
+  inner_join(
+    p_x_given_z, 
+    by = c('x', 'z'), 
+    suffix = c('_num', '_denom')
+  ) %>% 
+  mutate(p = p_num / p_denom) %>% 
+  group_by(x, y) %>%
+  summarise(p = sum(p)) 
+```
+
+```{r p_y_given_do_x_table, echo=FALSE}
+p_y_given_do_x %>% 
+  kable() %>% 
+  kable_styling(bootstrap_options = c('hover', 'striped', 'responsive'))
+```
+
+The causal effect estimates are very close to the simulated intervention.
+
+## Part c
+
+We can calculate ACE simply by taking the difference of the causal effect estimates.
+
+```{r ace}
+ace <- p_y_given_do_x %>% 
+  spread(x, p) %>% 
+  filter(y == 1) %>% 
+  mutate(ace = `1` - `0`) %>% 
+  pull(ace)
+
+ace
+```
+
+This is different from the overall probability differences.
+
+```{r risk_difference}
+p_y_given_x <- p_x_y_z %>% 
+  group_by(x, y) %>% 
+  summarise(n = sum(n)) %>% 
+  group_by(x) %>% 
+  mutate(p = n / sum(n)) %>% 
+  select(-n) 
+
+risk_difference <- p_y_given_x %>% 
+  spread(x, p) %>% 
+  filter(y == 1) %>% 
+  mutate(rd = `1` - `0`) %>% 
+  pull(rd)
+
+risk_difference
+```
+
+Making $X$ independent of $Z$ would minimise the disrepancy between ACE and RD, which would turn the adjustment formula into the formulat for $\mathbb P(y \mid x$. In other words, setting $q_0 = q_1 = \mathbb P(X = 1)$ would do the trick.
+
+## Part d
+
+Note that the desegregated causal effects
+
+* $p_{1, 0} - p_{0, 0}$ is `r p10 - p00`; and 
+* $p_{1, 1} - p_{0, 1}$ is `r p11 - p01`,
+
+are both consisent with our calculation for the overall causal effect, ACE = `r percent(ace)`. The generated data are an illustration of Simpson's reversal because the risk difference, `r percent(risk_difference)`, has the opposite sign.
