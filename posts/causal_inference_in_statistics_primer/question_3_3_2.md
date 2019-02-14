@@ -26,7 +26,7 @@ gain $W_g$ is defined as a linear function of the initial and final
 weights. From the graph we see that the plan chosen by the students is a
 function of their initial weight.
 
-![](tikz/question_3_3_2.svg)
+![A casual diagram for Lord's paradox](tikz/question_3_3_2.svg)
 
 Part b
 ------
