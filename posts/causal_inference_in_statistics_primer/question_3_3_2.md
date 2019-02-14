@@ -6,7 +6,7 @@ output:
   md_document:
     preserve_yaml: True
     variant: markdown
-tags: 'CISP chapter 3, solutions, "lord''s paradox", "simpson''s paradox"'
+tags: CISP chapter 3, solutions, lord's paradox, simpson's paradox
 title: 'CIS Primer Question 3.3.2'
 tldr: |
     Here are my solutions to question 3.3.2 of Causal Inference in

@@ -6,7 +6,7 @@ output:
   md_document:
     preserve_yaml: True
     variant: markdown
-tags: 'CISP chapter 3, solutions'
+tags: 'CISP chapter 3, solutions, backdoor criteria'
 title: 'CIS Primer Question 3.3.1'
 tldr: |
     Here are my solutions to question 3.3.1 of Causal Inference in

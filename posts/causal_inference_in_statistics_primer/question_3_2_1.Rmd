@@ -2,7 +2,7 @@
 title: "CIS Primer Question 3.2.1"
 author: "Brian Callander"
 date: "2019-02-10"
-tags: CISP chapter 3, solutions, ace, risk difference, simpsons reversal
+tags: CISP chapter 3, solutions, ace, risk difference, simpson's reversal
 tldr: Here are my solutions to question 3.2.1 of Causal Inference in Statistics a Primer (CISP).
 always_allow_html: yes
 output: 
