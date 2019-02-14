@@ -1,0 +1,35 @@
+\documentclass[crop]{standalone}
+
+\usepackage{amsmath}
+
+\usepackage[dvipsnames]{xcolor}
+\usepackage{tikz}
+
+\usetikzlibrary{shapes,decorations,arrows,calc,arrows.meta,fit,positioning}
+\tikzset{
+    -latex,
+    node distance =1 cm and 1 cm,
+    inner sep =0.15cm,
+    semithick,
+    O/.style ={rounded rectangle, draw, minimum width = 0.7 cm},
+    U/.style ={rounded rectangle, draw, minimum width = 0.7 cm, dashed},
+    fontscale/.style = {font=\huge}
+}
+
+\begin{document}
+
+
+\begin{tikzpicture}
+  \node[O] (x) at (0,0) {Plan};
+  \node[O] (y) [right=of x] {$W_g$};
+  \node[O] (wi) [above=of x] {$W_I$};
+  \node[O] (wf) [above=of y] {$W_F$};
+  \path (x) edge (y);
+  \path (wi) edge (x);
+  \path (wi) edge (y);
+  \path (wf) edge (y);
+
+\end{tikzpicture}
+
+
+\end{document}
