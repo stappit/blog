@@ -6,7 +6,7 @@ output:
   md_document:
     preserve_yaml: True
     variant: markdown
-tags: 'CISP chapter 1, solutions, simpsons reversal, product decomposition'
+tags: 'CISP chapter 1, solutions, simpson''s reversal, product decomposition'
 title: 'CIS Primer Question 1.5.2'
 tldr: |
     Here are my solutions to question 1.5.2 of Causal Inference in

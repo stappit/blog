@@ -6,7 +6,7 @@ output:
   md_document:
     preserve_yaml: True
     variant: markdown
-tags: 'CISP chapter 3, solutions, ace, risk difference, simpsons reversal'
+tags: 'CISP chapter 3, solutions, ace, risk difference, simpson''s reversal'
 title: 'CIS Primer Question 3.2.1'
 tldr: |
     Here are my solutions to question 3.2.1 of Causal Inference in
