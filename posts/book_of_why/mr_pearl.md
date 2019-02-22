@@ -41,6 +41,8 @@ If you are unfamiliar with Pearl's causal diagrams, the [primer](http://bayes.cs
 
 Pearl & Co more recently [published](https://pdfs.semanticscholar.org/b8a3/067d6c1fb255c9cdb5ac66037b82152ab3bb.pdf)  [some](https://www.aaai.org/ocs/index.php/AAAI/AAAI14/paper/viewFile/8628/8707) [papers](https://www.cs.purdue.edu/homes/eb/r29.pdf) related to selection bias. In particular, they introduce the selection-backdoor adjustment, which tells us how to estimate probabilistic and causal effects in the presence of selection bias. In the section below, we'll simply state and apply the results without justification; see [Theorem 2, Definition 4 (selection-backdoor criteria), and Theorem 5 (selection-backdoor adjustment)](https://www.aaai.org/ocs/index.php/AAAI/AAAI14/paper/viewFile/8628/8707) for the full details.
 
+See [my previous post](selection_bias.html) for a simulated example.
+
 ## MR. Pearl
 
 The Xbox Live paper illustrates MRP well since the poll is clearly heavily biased towards younger men. In Pearl's language, we could say $Z := \{\text{sex}, \text{age} \}$ are direct causes of both $S := \text{selection}$ and $Y := \text{voting intention}$. Gelman also identifies a number of other features relevant to voting intention, which we'll denote by $X$: `race`, `education`, `state`, `party ID`, `ideology`, and `2008 vote`. These other features are not indicated in the paper as causes of `selection`, and the plots shown don't strongly suggest they are either. We'll ignore possible causal interactions between the political and historical features and work with the following simplified causal model:

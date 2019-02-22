@@ -22,7 +22,7 @@ We'll run a simulation in the context of measuring the [click-through rate (CTR)
 1. give wrong estimates of the CTRs, and
 2. mask actual differences in the CTRs.
 
-We'll then rectify the above problems by defining a causal model and using the [backdoor adjustment](http://nickchk.com/causalgraphs.html#control).
+We'll then rectify the above problems by defining a causal model and using the [backdoor adjustment](https://www.aaai.org/ocs/index.php/AAAI/AAAI14/paper/viewFile/8628/8707).
 
 Feel free to [download the Rmarkdown](selection_bias.Rmd) and try it out for yourself.
 
@@ -307,55 +307,41 @@ The causal model used in the previous section consists of only two nodes: `cohor
 
 ![Wrong causal model](./tikz/wrong.svg){width=60%}
 
-Although we intervene on `cohort` (there are no arrows into `cohort`), users can chose whether they take part in the experiments so we should model this self selection. The case we are interested in posits `engagement` as a confounder for participation and clicking.
+Although we intervene on `cohort` (there are no arrows into `cohort`), users can chose whether they take part in the experiments so we should model this self selection. The case we are interested in posits `engagement` as a confounder for viewing and clicking. We highlight `view` because our data are implicitly conditioned on users viewing the variant they were assigned.
+
 
 ![Simple causal model](./tikz/simple.svg){width=90%}
 
-This looks like a setup where `cohort` is an instrumental variable for measuring the causal effect of `view` on `click`. If it were, we wouldn't have to condition on `engagement`. The reason it is not an instrumental variable is that our data are collected only for users who `view`, implying that we are implicitly conditioning on `view`, a collider. As such, we unblock the non-causal path `cohort` → `view` ← `engagement` → `click`. To   block it, we need to condition on `engagement`.
+Since we only have data for users who viewed the variants assigned to them, we know that these users are likely more engaged, and thus more likely to click. This explains why the naive analysis returns a CTR that is too high. Given that there is an interaction between engagement and cohort in our data, this also explains why the effect of the cohort is masked. In order to get to the parameters of interest, we need to make an adjustment.
 
 ### The backdoor adjustment
 
-Given our simple model above, we can use the backdoor criterion to find the causal effect of `view`. Note that `view` is considered to have 3 possible values: "did not participate", "participated in cohort 0", and "participated in cohort 1". The causal effect of `view` on `click` is then
+[Pearl+Co have shown](https://www.aaai.org/ocs/index.php/AAAI/AAAI14/paper/viewFile/8628/8707) that the backdoor adjustment can be applied in the above case - even in the presence of selection bias - given that we have external data about our population to estimate the the probability of engagement. The causal effect of $X =$ `cohort` on $Y=$ `click` is then
 
 $$
 \begin{align}
-  \mathbb P (C = 1 \mid \do(V = v)) 
+  \mathbb P (Y = 1 \mid \do(X = x)) 
   &= 
-  \sum_{e=-1}^2 \mathbb P (C = 1 \mid V = v, E = e) \mathbb P(E = e)
+  \sum_{e=-1}^2 \mathbb P (Y = 1 \mid X = x, E = e, V = 1) \mathbb P(E = e)
   \\
   &=
-  \mathbb P (C = 1 \mid V = v, E = -1) \times 0.614
+  \mathbb P (Y = 1 \mid X = x, E = -1, V = 1) \times 0.614
   \\
   &\mathbin{\hphantom{=}}
   +
-  \mathbb P (C = 1 \mid V = v, E = 0) \times 0.325
+  \mathbb P (Y = 1 \mid X = x, E = 0, V = 1) \times 0.325
   \\
   &\mathbin{\hphantom{=}}
   +
-  \mathbb P (C = 1 \mid V = v, E = 1) \times 0.058
+  \mathbb P (Y = 1 \mid X = x, E = 1, V = 1) \times 0.058
   \\
   &\mathbin{\hphantom{=}}
   +
-  \mathbb P (C = 1 \mid V = v, E = 2) \times 0.003
+  \mathbb P (Y = 1 \mid X = x, E = 2, V = 1) \times 0.003
 \end{align}
 $$
 
-where we have used the population frequency of the engagement segments for $\mathbb P(E = e)$ (see below). 
-
-It is easiest to calculate the probability of a click given non-participation. Amongst users that didn't participate, none clicked. This implies that the association is 0 regardless of `engagement`, which in turn implies
-
-$$
-\mathbb P(C = 1 \mid \do(V = \text{didn't participate})) = 0
-.
-$$
-
-The causal effect for other values of $V$ is calculated below. Holding `engagement` constant, the causal effect of `cohort` in `view` is simply random sampling, so 
-
-$$
-\mathbb P (C = 1 \mid \do(\text{Cohort} = c)) = \mathbb P (C = 1 \mid \do(V = c)),
-$$
-
-for $c = 0, 1$.
+where we have used the population frequency of the engagement segments for $\mathbb P(E = e)$ (see below). Note that the probabilities we need to estimate can all be estimated from the observed data because they are all conditional on participation ($V=1$).
 
 ### Causally modelling the data
 

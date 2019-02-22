@@ -1,7 +1,7 @@
 \documentclass[crop]{standalone}
 
 \usepackage{amsmath}
-
+\usepackage[dvipsnames]{xcolor}
 \usepackage{tikz}
 
 \usetikzlibrary{shapes,decorations,arrows,calc,arrows.meta,fit,positioning}
@@ -20,13 +20,12 @@
 
 \begin{tikzpicture}
   \node[O] (x) at (0,0) {Cohort};
-  \node[O] (m) [right =of x] {View};
-  \node[O] (y) [right =of m] {Click};
-  \node[O] (c) [above =of m] {Engagement};
-  \path (x) edge (m);
-  \path (m) edge (y);
-  \path (c) edge (m);
-  \path (c) edge (y);
+  \node[O, fill=SkyBlue] (v) [above =of x] {View};
+  \node[O] (y) [right =of x] {Click};
+  \node[O] (e) [above =of y] {Engagement};
+  \path (x) edge (y);
+  \path (e) edge (v);
+  \path (e) edge (y);
 
 \end{tikzpicture}
 
