@@ -1,0 +1,454 @@
+---
+title: "Pareto-NBD Customer Lifetime Value"
+author: "Brian Callander"
+date: "2019-04-01"
+tags: customer lifetime value, Pareto-NBD
+tldr: "WIP"
+always_allow_html: yes
+output: 
+  md_document:
+    variant: markdown
+    preserve_yaml: yes
+---
+
+Suppose you have a bunch of customers who make repeat purchases - some more frequenty, some less. There are a few things you might like to know about these customers, such as
+
+* which customers are still active (i.e. not yet churned) and likely to continue purchasing from you?; and
+* how many purchases can you expect from each customer?
+
+Modelling this directly is more difficult than it might seem. A customer that regularly makes purchases every day might be considered at risk of churning if they haven't purchased anything in the past week, whereas a customer that regularly puchases once per month would not be considered at risk of churning. That is, churn and frequency of purchasing are closely related. The difficulty is that we don't observe the moment of churn of any customer and have to model it probabilistically.
+
+There are a number of established models for estimating this, the most well-known perhaps being the [SMC model](https://pubsonline.informs.org/doi/abs/10.1287/mnsc.33.1.1) (a.k.a pareto-nbd model). There are already some implementations using maximum likelihood or Gibbs sampling. In this post, we'll explain how the model works, make some prior predictive simulations, and fit a hierarchical version using Hamiltonian Monte Carlo (with stan).
+
+<!--more-->
+
+<div style="display:none">
+  $\DeclareMathOperator{\dbinomial}{Binomial}
+   \DeclareMathOperator{\dbern}{Bernoulli}
+   \DeclareMathOperator{\dpois}{Poisson}
+   \DeclareMathOperator{\dnorm}{Normal}
+   \DeclareMathOperator{\dt}{t}
+   \DeclareMathOperator{\dcauchy}{Cauchy}
+   \DeclareMathOperator{\dexp}{Exp}
+   \DeclareMathOperator{\duniform}{Uniform}
+   \DeclareMathOperator{\dgamma}{Gamma}
+   \DeclareMathOperator{\dinvgamma}{InvGamma}
+   \DeclareMathOperator{\invlogit}{InvLogit}
+   \DeclareMathOperator{\logit}{Logit}
+   \DeclareMathOperator{\ddirichlet}{Dirichlet}
+   \DeclareMathOperator{\dbeta}{Beta}$
+</div>
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(
+  echo = TRUE,
+  comment = NA,
+  message = FALSE,
+  warning = FALSE,
+  error = TRUE,
+  # cache = TRUE,
+  dev = "svglite"
+)
+
+library(tidyverse)
+library(scales)
+
+library(kableExtra)
+library(here)
+
+library(rstan)
+library(tidybayes)
+library(bayesplot)
+
+library(LaplacesDemon)
+
+
+rstan_options(auto_write = TRUE)
+options(mc.cores = parallel::detectCores())
+
+theme_set(theme_bw())
+
+set.seed(31508) # https://www.random.org/integers/?num=2&min=1&max=100000&col=5&base=10&format=html&rnd=new
+
+```
+
+```{r functions, echo=FALSE}
+inv_logit <- function(x) 1 / (1 + exp(-x))
+```
+
+## Data Generating Process
+
+Let's describe the model first by simulation. Suppose we have a company that is 2 years old and a total of 1000 customers, $C$, that have made at least one purchase from us. We'll assume a linear rate of customer acquisition so that the first purchase date is simply a uniform random variable over the 2 years of the company existance. These assumptions are just to keep the example concrete, and are not so important for understanding the model.
+
+```{r customers}
+customers <- tibble(id = 1:1000) %>% 
+  mutate(
+    end = 2 * 365,
+    start = runif(n(), 0, end - 1),
+    T = end - start
+  )
+```
+
+First the likelihood. Each customer $c \in C$ is assumed to have a certain lifespan, $\tau_c \sim \dexp(\mu_c)$. We only observe the customer for $T$ units of time, and this observation time can be either larger or smaller than the lifespan, $\tau$. Whilst the customer is "alive", they are assumed to purchase at a fixed rate, $\lambda_c$, so that the waits between purchases are $\dexp(\lambda_c)$-distributed. The customer will continue purchasing until the end of their lifetime or until the end of the observation period, whichever happens first.
+
+```{r likelihood}
+sample_conditional <- function(mu, lambda, T) {
+  
+  # lifetime
+  tau <- rexp(1, mu)
+  
+  # start with 0 purchases
+  t <- 0
+  k <- 0
+  
+  # simulate time till next purchase
+  wait <- rexp(1, lambda)
+  
+  # keep purchasing till end of life/observation
+  while(t + wait <= pmin(T, tau)) {
+    t <- t + wait
+    k <- k + 1
+    wait <- rexp(1, lambda)
+  }
+  
+  # return tabular data
+  tibble(
+    mu = mu,
+    lambda = lambda,
+    T = T,
+    tau = tau,
+    k = k,
+    t = t
+  )
+}
+
+sample_conditional(0.01, 2, 30)
+```
+
+```{r prior_mu, message=TRUE, warning=TRUE, fig.width=10, fig.height=6}
+prior_predictive_tau <- tibble(iter = 1:12) %>% 
+  mutate(
+    mean = rlnorm(n(), 3, 1.5),
+    variance = rnorm(n(), 0, 5) %>% abs(),
+    beta = mean^3 / variance + mean,
+    alpha = mean^2 / variance + 2
+  ) %>% 
+  crossing(draw = 1:10000) %>% 
+  group_by(iter, mean, variance) %>% 
+  mutate(
+    etau = rinvgamma(n(), alpha, beta),
+    mu = 1 / etau, 
+    tau = rexp(n(), mu)
+  ) 
+
+prior_predictive_tau %>% 
+  summarise(
+    q5 = quantile(tau, 0.05),
+    q95 = quantile(tau, 0.95),
+    m = min(tau),
+    M = max(tau),
+    med = median(tau),
+    avg = mean(tau)
+  )
+
+prior_predictive_tau %>% 
+  # group_by(iter) %>% 
+  # filter(tau < quantile(tau, 0.95)) %>% 
+  # gather(parameter, value, mu_mean, tau) %>%
+  ggplot() + 
+  # aes(value, fill = parameter) +
+  aes(tau) +
+  # aes(mu_mean) +
+  scale_x_continuous(
+    breaks = seq(0, 20000, 180),
+    limits = c(NA, 2 * 365)
+  ) +
+  geom_histogram() +
+  facet_wrap(~iter) +
+  NULL
+
+```
+
+```{r prior_predictive_lambda, fig.width=10, fig.height=8}
+prior_predictive_lambda <- tibble(iter = 1:12) %>% 
+  mutate(
+    mean = rgamma(n(), 2, 8), 
+    variance = rnorm(n(), 0, 0.1) %>% abs(), 
+    beta = mean / variance, 
+    alpha = mean * beta
+  ) %>% 
+  crossing(draw = 1:10000) %>% 
+  group_by(iter, mean) %>% 
+  mutate(
+    lambda = rgamma(n(), alpha, beta),
+    lambda_max = max(lambda),
+    lambda99 = quantile(lambda, 0.99)
+  ) 
+
+prior_predictive_lambda %>% 
+  summarise(
+    median(lambda),
+    mean(lambda),
+    quantile(lambda, 0.99),
+    max(lambda)
+  )
+
+prior_predictive_lambda %>% 
+  ggplot() + 
+  aes(lambda) +
+  geom_histogram() +
+  scale_x_continuous(
+    limits = c(NA, 2),
+    breaks = seq(0, 100, 0.25),
+    labels = signif
+  ) +
+  facet_wrap(~iter) +
+  NULL
+```
+
+```{r data}
+set.seed(691)
+
+mu_mean <- rlnorm(1, 3, 1.5)
+mu_variance <- rnorm(1, 0, 5) %>% abs()
+mu_beta <- mu_mean^3 / mu_variance + mu_mean
+mu_alpha <- mu_mean^2 / mu_variance + 2
+
+lambda_mean <- rgamma(1, 2, 8)
+lambda_variance <- rnorm(1, 0, 0.1) %>% abs()
+lambda_beta <- lambda_mean / lambda_variance
+lambda_alpha <- lambda_mean * lambda_beta
+
+df <- customers %>% 
+  mutate(
+    mu = rgamma(n(), mu_alpha, mu_beta),
+    lambda = rgamma(n(), lambda_alpha, lambda_beta)
+  ) %>% 
+  group_by(id) %>% 
+  group_map(~sample_conditional(.$mu, .$lambda, .$T)) 
+
+```
+
+```{r data_table, echo=FALSE}
+df %>% 
+  head() %>% 
+  kable() %>% 
+  kable_styling(bootstrap_options = c("striped", "hover", "responsive"))
+  
+```
+
+```{r}
+df %>% 
+  ggplot() + 
+  aes(tau) + 
+  geom_histogram() + 
+  # scale_x_continuous(
+  #   limits = c(NA, 700), 
+  #   breaks = seq(0, 800, 90)
+  # )
+  NULL
+```
+
+```{r}
+df %>% 
+  ggplot() + 
+  aes(lambda) + 
+  geom_histogram()  +
+  scale_x_continuous(
+    limits = c(NA, 2),
+    # breaks = seq(0, 800, 90)
+  ) +
+  NULL
+```
+
+## Likelihood
+
+The likelihood is somewhat complicated, so we'll derive a simpler expression for it. Knowing the lifespan simplifies the probabilities, so we'll express the liklihood as the marginalisation over $\tau$.
+
+$$
+\begin{align}
+  \mathbb P (k, t \mid \mu, \lambda)
+  &=
+  \int_{\tau = 0}^\infty \mathbb P (k, t \mid \mu, \lambda, \tau) \cdot \mathbb P(\tau \mid \mu, \lambda) d\tau
+  \\
+  &=
+  \int_{\tau = 0}^T \mathbb P (k, t \mid \mu, \lambda, \tau) \cdot \mathbb P(\tau \mid \mu, \lambda)
+  +
+  \int_{\tau = T}^\infty \mathbb P (k, t \mid \mu, \lambda, \tau) \cdot \mathbb P(\tau \mid \mu, \lambda)
+  \\
+  &=
+  \int_{\tau = 0}^T \dpois(k \mid \tau\lambda) \cdot \dexp(\tau \mid \mu) d\tau
+  +
+  \int_{\tau = T}^\infty \dpois(k \mid T\lambda) \cdot \dexp(\tau \mid \mu) d\tau
+  
+\end{align}
+$$
+
+The right-hand side is straight forward. The Poisson probabilities can be pulled out of the integral, turning the remaining integral into the survival function of the exponential distribution.
+
+
+$$
+\begin{align}
+  \text{RHS}
+  &=
+  \int_{\tau = T}^\infty \dpois(k \mid T\lambda) \cdot \dexp(\tau \mid \mu) d\tau
+  \\
+  &\propto
+  \lambda^k e^{-T\lambda} \int_T^\infty \dexp(\tau \mid \mu) d\tau
+  \\
+  &=
+  \lambda^k e^{-T\lambda} e^{-T\mu}
+  \\
+  &=
+  \lambda^k e^{-T(\lambda + \mu)} 
+\end{align}
+$$
+
+The left-hand side is a little more involved.
+
+$$
+\begin{align}
+  \text{LHS}
+  &=
+  \int_{\tau = 0}^T \dpois(k \mid t\lambda) \dpois(0 \mid (\tau - t) \lambda) \cdot \dexp(\tau \mid \mu) d\tau
+  \\
+  &=
+  (t\lambda)^k e^{-t\lambda} \int_0^T e^{-(\tau - t)\lambda} \mu e^{-\tau\mu} d\tau
+  \\
+  &=
+  (t\lambda)^k \mu \int_0^T e^{-\tau(\lambda + \mu)} d\tau
+  \\
+  &=
+  \left. (t\lambda)^k \mu \frac{ e^{-\tau(\lambda + \mu)}}{-(\lambda + \mu)} \right|_0^T
+  \\
+  &=
+  (t\lambda)^k \mu \frac{ e^{-t(\lambda + \mu)} - e^{-T(\lambda + \mu)}}{\lambda + \mu} 
+
+\end{align}
+$$
+
+Adding both expressions gives our final expression for the likelihood
+
+$$
+\begin{align}
+  \mathbb P (k, t \mid \mu, \lambda)
+  &=
+  (t\lambda)^k \mu \frac{ e^{-t(\lambda + \mu)} - e^{-T(\lambda + \mu)}}{\lambda + \mu} 
+  +
+  (t\lambda)^k e^{-T(\lambda + \mu)} 
+  \\
+  &=
+  \frac{(t\lambda)^k}{\lambda + \mu}
+  \left( \mu e^{-t(\lambda + \mu)} - \mu e^{-T(\lambda + \mu)} + \mu e^{-T(\lambda + \mu)} + \lambda e^{-T(\lambda + \mu)} \right)
+  \\
+  &=
+  \frac{(t\lambda)^k}{\lambda + \mu}
+  \left( \mu e^{-t(\lambda + \mu)} + \lambda e^{-T(\lambda + \mu)} \right)
+  ,
+\end{align}
+$$
+
+which agrees with equation 2 in [ML07](https://ieeexplore.ieee.org/document/4344404). To implement this in stan, we'll need the log-likelihood, given by 
+
+$$
+\log\mathbb P (k, t \mid \mu, \lambda)
+=
+k \log\lambda - \log(\lambda + \mu) + \log\left(\mu e^{-t(\lambda + \mu)} + \lambda e^{-T(\lambda + \mu)} \right)
+,
+$$
+
+where we have dropped constant factors.
+
+## Stan implementation
+
+```{r stan_model, results='hide'}
+pnb <- here('models/pnbd.stan') %>% 
+  stan_model() 
+```
+
+```{r model, echo=FALSE}
+pnb
+```
+
+```{r fit}
+pnb_fit <- rstan::sampling(
+    pnb,
+    data = compose_data(
+      df,
+      lambda_mean_alpha = 2,
+      lambda_mean_beta = 8,
+      lambda_variance_sigma = 0.1,
+      etau_mean_mu = 3,
+      etau_mean_sigma = 1.5,
+      etau_variance_sigma = 5
+    ),
+    control = list(
+      adapt_delta = 0.9,
+      max_treedepth = 12
+    ),
+    warmup = 1500,
+    iter = 3000,
+    chains = 4,
+    cores = 4
+  ) %>% 
+  recover_types(df) 
+
+# pnb_fit %>% 
+#   saveRDS(here('models/pnb_fit.rds'))
+
+```
+
+```{r diagnostics, message=TRUE, warning=TRUE}
+pnb_fit %>% 
+  check_hmc_diagnostics()
+```
+
+```{r neff}
+pnb_neff <- pnb_fit %>% 
+  neff_ratio() %>% 
+  tibble(
+    ratio = .,
+    parameter = names(.)
+  )
+```
+
+```{r neff_table}
+pnb_neff %>% 
+  filter(ratio < 0.8) %>% 
+  arrange(ratio) %>% 
+  kable() %>% 
+  kable_styling(bootstrap_options = c("striped", "hover", "responsive"))
+```
+
+```{r rhat}
+pnb_fit %>% 
+  rhat() %>% 
+  max()
+```
+
+```{r}
+calibration <- pnb_fit %>% 
+  spread_draws(mu[id], lambda[id]) %>% 
+  mean_qi(.width = 0.5) %>% 
+  inner_join(df, by = 'id') %>% 
+  summarise(
+    mu = mean(mu.lower <= mu.y & mu.y <= mu.upper),
+    lambda = mean(lambda.lower <= lambda.y & lambda.y <= lambda.upper)
+  )
+```
+
+```{r}
+pnb_fit %>% 
+  gather_draws(mu_mean, mu_variance, lambda_mean, lambda_variance) %>% 
+  head()
+  
+```
+
+
+
+## Next Steps
+
+* real data
+* single-purchase customers
+* larger lifetime => larger purchase rate
+* covariates
