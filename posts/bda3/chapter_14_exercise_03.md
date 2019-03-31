@@ -49,7 +49,7 @@ $$
 \end{align}
 $$
 
-where $Q$ is [orthogonal](https://en.wikipedia.org/wiki/Orthogonal_matrix) and $R$ an invertible [upper triangular matrix](https://en.wikipedia.org/wiki/Triangular_matrix). We can read of the minimum of this quadratic form as
+where $Q$ is [orthogonal](https://en.wikipedia.org/wiki/Orthogonal_matrix) and $R$ an invertible [upper triangular matrix](https://en.wikipedia.org/wiki/Triangular_matrix). We can read off the minimum of this quadratic form as
 
 $$
 \hat\beta
