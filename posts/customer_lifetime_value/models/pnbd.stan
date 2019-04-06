@@ -7,8 +7,8 @@ data {
   real<lower = 0> lambda_mean_alpha;
   real<lower = 0> lambda_mean_beta;
   real<lower = 0> lambda_variance_sigma;
-  real<lower = 0> etau_mean_mu;
-  real<lower = 0> etau_mean_sigma;
+  real<lower = 0> etau_mean_alpha;
+  real<lower = 0> etau_mean_beta;
   real<lower = 0> etau_variance_sigma;
 }
 
@@ -34,7 +34,7 @@ transformed parameters {
 
 model {
   // priors
-  etau_mean ~ lognormal(etau_mean_mu, etau_mean_sigma);
+  etau_mean ~ gamma(etau_mean_alpha, etau_mean_beta);
   etau_variance ~ normal(0, etau_variance_sigma);
   etau ~ inv_gamma(etau_alpha, etau_beta);
 
