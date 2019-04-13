@@ -122,6 +122,8 @@ process <- function(arrivals, t=0) {
     n_patients = length(arrivals),
     n_waited = n_waited,
     time_waiting = time_waiting,
+    time_waiting_per_patient = time_waiting / length(arrivals),
+    time_waiting_per_waiting_patient = time_waiting / n_waited,
     closing_time = pmax(max(doctors), t)
   ) %>% return()
     
@@ -139,6 +141,12 @@ arrivals(λ, t) %>%
 
     $time_waiting
     [1] 0
+
+    $time_waiting_per_patient
+    [1] 0
+
+    $time_waiting_per_waiting_patient
+    [1] NaN
 
     $closing_time
     [1] 425.9203
@@ -273,9 +281,9 @@ sims_summary <- sims %>%
   gather(variable, value) %>% 
   group_by(variable) %>% 
   summarise(
-    q25 = quantile(value, 0.25),
-    q50 = quantile(value, 0.5),
-    q75 = quantile(value, 0.75),
+    q25 = quantile(value, 0.25, na.rm=TRUE),
+    q50 = quantile(value, 0.5, na.rm=TRUE),
+    q75 = quantile(value, 0.75, na.rm=TRUE),
     simulations = n()
   )
 ```
