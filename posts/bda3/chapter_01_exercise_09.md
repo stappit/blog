@@ -70,15 +70,15 @@ t <- (16 - 9) * 60
 arrivals(λ, t)
 ```
 
-     [1]   8.553171  37.432026  41.871974  49.278030  59.254108  65.324981
-     [7]  82.334677  86.637271  87.011499  95.725734 115.382962 127.752763
-    [13] 132.191805 144.314143 146.950480 154.842176 165.419482 166.811901
-    [19] 188.446479 191.482675 196.825827 205.611658 218.840513 229.112146
-    [25] 234.566713 245.715737 247.014959 251.843457 255.886919 270.347635
-    [31] 280.522572 283.621836 289.637068 298.571320 315.922588 324.476085
-    [37] 325.395870 327.868857 330.081686 331.101767 339.438330 339.777383
-    [43] 341.035940 368.511484 368.530882 380.830336 382.230143 386.228364
-    [49] 389.420076 403.214854 409.342300 413.720262
+     [1]   4.854265   4.963889   6.651014   9.518990  17.415709  20.110178
+     [7]  28.852188  34.862538  35.970215  44.205468  48.342152  52.934693
+    [13]  83.072579  86.746318 117.586517 122.811176 133.662687 142.016603
+    [19] 170.935913 190.999325 202.511439 204.915770 205.191951 208.422873
+    [25] 219.437526 225.162971 233.122550 235.351649 253.558658 254.097711
+    [31] 255.639118 256.270049 277.905899 291.055504 291.737173 294.688419
+    [37] 300.949679 302.681417 329.751112 335.998940 355.506712 361.162687
+    [43] 381.436543 388.767558 393.072689 393.088807 395.570811 401.669343
+    [49] 401.911643 408.650710 418.291196
 
 Given the patients that arrive in a day, we now need a function to
 simulate the appointments. Let's assume the patients get seen in the
@@ -134,7 +134,7 @@ arrivals(λ, t) %>%
 ```
 
     $n_patients
-    [1] 33
+    [1] 39
 
     $n_waited
     [1] 0
@@ -149,7 +149,7 @@ arrivals(λ, t) %>%
     [1] NaN
 
     $closing_time
-    [1] 425.9203
+    [1] 426.9273
 
 To simulate the above many times, we'll use the `replicate` function.
 For convenience, we'll turn this into a `tibble`.
@@ -182,6 +182,12 @@ n\_waited
 time\_waiting
 </th>
 <th style="text-align:right;">
+time\_waiting\_per\_patient
+</th>
+<th style="text-align:right;">
+time\_waiting\_per\_waiting\_patient
+</th>
+<th style="text-align:right;">
 closing\_time
 </th>
 </tr>
@@ -189,72 +195,22 @@ closing\_time
 <tbody>
 <tr>
 <td style="text-align:right;">
-36
-</td>
-<td style="text-align:right;">
-5
-</td>
-<td style="text-align:right;">
-7.849097
-</td>
-<td style="text-align:right;">
-428.0292
-</td>
-</tr>
-<tr>
-<td style="text-align:right;">
-25
-</td>
-<td style="text-align:right;">
-0
-</td>
-<td style="text-align:right;">
-0.000000
-</td>
-<td style="text-align:right;">
-420.0000
-</td>
-</tr>
-<tr>
-<td style="text-align:right;">
-43
-</td>
-<td style="text-align:right;">
-12
-</td>
-<td style="text-align:right;">
-68.185313
-</td>
-<td style="text-align:right;">
-424.2967
-</td>
-</tr>
-<tr>
-<td style="text-align:right;">
 45
 </td>
 <td style="text-align:right;">
-4
+8
 </td>
 <td style="text-align:right;">
-6.891720
+10.493347
 </td>
 <td style="text-align:right;">
-425.0424
-</td>
-</tr>
-<tr>
-<td style="text-align:right;">
-38
+0.2331855
 </td>
 <td style="text-align:right;">
-4
+1.311668
 </td>
 <td style="text-align:right;">
-13.346805
-</td>
-<td style="text-align:right;">
-429.7816
+421.2221
 </td>
 </tr>
 <tr>
@@ -262,13 +218,99 @@ closing\_time
 44
 </td>
 <td style="text-align:right;">
-8
+6
 </td>
 <td style="text-align:right;">
-51.054677
+13.226377
 </td>
 <td style="text-align:right;">
-424.8640
+0.3005995
+</td>
+<td style="text-align:right;">
+2.204396
+</td>
+<td style="text-align:right;">
+435.4524
+</td>
+</tr>
+<tr>
+<td style="text-align:right;">
+29
+</td>
+<td style="text-align:right;">
+1
+</td>
+<td style="text-align:right;">
+1.174172
+</td>
+<td style="text-align:right;">
+0.0404887
+</td>
+<td style="text-align:right;">
+1.174172
+</td>
+<td style="text-align:right;">
+435.9763
+</td>
+</tr>
+<tr>
+<td style="text-align:right;">
+31
+</td>
+<td style="text-align:right;">
+1
+</td>
+<td style="text-align:right;">
+9.413756
+</td>
+<td style="text-align:right;">
+0.3036696
+</td>
+<td style="text-align:right;">
+9.413756
+</td>
+<td style="text-align:right;">
+440.1210
+</td>
+</tr>
+<tr>
+<td style="text-align:right;">
+40
+</td>
+<td style="text-align:right;">
+5
+</td>
+<td style="text-align:right;">
+16.692607
+</td>
+<td style="text-align:right;">
+0.4173152
+</td>
+<td style="text-align:right;">
+3.338521
+</td>
+<td style="text-align:right;">
+431.8950
+</td>
+</tr>
+<tr>
+<td style="text-align:right;">
+37
+</td>
+<td style="text-align:right;">
+2
+</td>
+<td style="text-align:right;">
+11.329963
+</td>
+<td style="text-align:right;">
+0.3062152
+</td>
+<td style="text-align:right;">
+5.664981
+</td>
+<td style="text-align:right;">
+420.0000
 </td>
 </tr>
 </tbody>
@@ -320,10 +362,10 @@ closing\_time
 420.000000
 </td>
 <td style="text-align:right;">
-426.24414
+424.9488049
 </td>
 <td style="text-align:right;">
-431.45153
+430.7023807
 </td>
 <td style="text-align:right;">
 1000
@@ -334,13 +376,13 @@ closing\_time
 n\_patients
 </td>
 <td style="text-align:right;">
-37.000000
+38.000000
 </td>
 <td style="text-align:right;">
-42.00000
+42.0000000
 </td>
 <td style="text-align:right;">
-46.00000
+46.2500000
 </td>
 <td style="text-align:right;">
 1000
@@ -354,10 +396,10 @@ n\_waited
 3.000000
 </td>
 <td style="text-align:right;">
-5.00000
+5.0000000
 </td>
 <td style="text-align:right;">
-9.00000
+9.0000000
 </td>
 <td style="text-align:right;">
 1000
@@ -368,13 +410,47 @@ n\_waited
 time\_waiting
 </td>
 <td style="text-align:right;">
-8.920944
+8.266744
 </td>
 <td style="text-align:right;">
-20.48693
+19.3983242
 </td>
 <td style="text-align:right;">
-38.40291
+38.9367142
+</td>
+<td style="text-align:right;">
+1000
+</td>
+</tr>
+<tr>
+<td style="text-align:left;">
+time\_waiting\_per\_patient
+</td>
+<td style="text-align:right;">
+0.212705
+</td>
+<td style="text-align:right;">
+0.4685262
+</td>
+<td style="text-align:right;">
+0.8622254
+</td>
+<td style="text-align:right;">
+1000
+</td>
+</tr>
+<tr>
+<td style="text-align:left;">
+time\_waiting\_per\_waiting\_patient
+</td>
+<td style="text-align:right;">
+2.660497
+</td>
+<td style="text-align:right;">
+3.8266619
+</td>
+<td style="text-align:right;">
+5.1309744
 </td>
 <td style="text-align:right;">
 1000
