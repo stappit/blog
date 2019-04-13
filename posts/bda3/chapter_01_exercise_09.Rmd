@@ -1,0 +1,160 @@
+---
+title: "BDA3 Chapter 1 Exercise 9"
+author: "Brian Callander"
+date: "2019-04-13"
+tags: bda chapter 1, solutions, simulation, poisson process
+tldr: "Here's my solution to exercise 9, chapter 1, of Gelman's Bayesian Data Analysis (BDA), 3rd edition."
+always_allow_html: yes
+output: 
+  md_document:
+    variant: markdown
+    preserve_yaml: yes
+---
+
+Here's my solution to exercise 9, chapter 1, of [Gelman's](https://andrewgelman.com/) *Bayesian Data Analysis* (BDA), 3rd edition. There are [solutions](http://www.stat.columbia.edu/~gelman/book/solutions.pdf) to some of the exercises on the [book's webpage](http://www.stat.columbia.edu/~gelman/book/).
+
+<!--more-->
+
+<div style="display:none">
+  $\DeclareMathOperator{\dbinomial}{Binomial}
+   \DeclareMathOperator{\dbern}{Bernoulli}
+   \DeclareMathOperator{\dpois}{Poisson}
+   \DeclareMathOperator{\dnorm}{Normal}
+   \DeclareMathOperator{\dt}{t}
+   \DeclareMathOperator{\dcauchy}{Cauchy}
+   \DeclareMathOperator{\dexponential}{Exp}
+   \DeclareMathOperator{\duniform}{Uniform}
+   \DeclareMathOperator{\dgamma}{Gamma}
+   \DeclareMathOperator{\dinvgamma}{InvGamma}
+   \DeclareMathOperator{\invlogit}{InvLogit}
+   \DeclareMathOperator{\logit}{Logit}
+   \DeclareMathOperator{\ddirichlet}{Dirichlet}
+   \DeclareMathOperator{\dbeta}{Beta}$
+</div>
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(
+  echo = TRUE,
+  comment = NA,
+  message = FALSE,
+  warning = FALSE,
+  error = TRUE,
+  cache = TRUE,
+  dev = "svglite"
+)
+
+library(tidyverse)
+library(scales)
+library(kableExtra)
+
+theme_set(theme_bw())
+
+```
+
+Suppose there 3 doctors, who open their practice at 09:00 and stop accepting patients at 16:00. If customers arrive in exponentially distributed intervals with mean 10 minutes, and appointment duration is uniformly distributed between 5 and 10 minutes, we want to know:
+
+* how many patients arrive per day?
+* how many patients have to wait for their appointment?
+* how long do patients have to wait?
+* when does the last patient leave the practice?
+
+We do this by simulation. The `arrivals` function will simulate the arrival times of the patients, in minutes after 09:00. In principle, we should simulate draws from the exponential distribution until the sum of all draws is above `r (16 - 9) * 60`, the number of minutes the practice accepts patients. However, I couldn't find any efficient way to run this in R. Instead we'll draw so many variables such that is is highly unlikely that we have too few, then just filter out what we don't need. 
+
+To calculate a suitably large number, note that the number of patients in one day is $\dpois(\frac{1}{10} \cdot (16 - 9) \cdot 60)$-distributed. The 99.99999% percentile of this distribution is `qpois(0.9999999, (16 - 9) * 6) =` `r qpois(0.9999999, (16 - 9) * 6)`. We'll err on the safe side and use $n=100$.
+
+```{r arrivals}
+arrivals <- function(λ, t, n=100) {
+  rexp(n, λ) %>% 
+    tibble(
+      delay = .,
+      time = cumsum(delay)
+    ) %>% 
+    filter(time <= t) %>% 
+    pull(time) %>% 
+    return()
+}
+
+λ <- 1 / 10
+t <- (16 - 9) * 60
+
+arrivals(λ, t)
+```
+
+Given the patients that arrive in a day, we now need a function to simulate the appointments. Let's assume the patients get seen in the order they arrive. As we cycle through the patients, we'll keep track of 
+
+* `n_waited`, the number of patients who have had to wait for their appointment so far;
+* `time_waiting`, the sum of all waiting times of the patients so far; and
+* `doctors`, the next time at which each doctor is free to see another patient.
+
+The `doctors` variable starts at `c(0, 0, 0)` because they are immediately availble to see patients. The doctor with the smallest availability time is the next doctor to see a patient. The start of the appointment is either the doctor's availability time or the arrival time of the patient, whichever is greater. The end of the appointment is $\duniform(5, 20)$-minutes after the start of the appointment. The doctor's availability time is then set to the end of the appointment. Once all patients have been given an appointment, the closing time is the maximum of the doctors' next availability times or the closing time `(16 - 9) * 60`, whichever is greater.
+
+```{r process}
+process <- function(arrivals, t=0) {
+  
+  n_waited <- 0         # number of patients who have had to wait so far
+  time_waiting <- 0     # total waiting time so far
+  doctors <- c(0, 0, 0) # next time at which each doctor is free to see another patient
+  
+  for(i in (1:length(arrivals))) {
+    wait <- pmax(min(doctors) - arrivals[i], 0) # waiting time of patient i
+    time_waiting <- time_waiting + wait
+    n_waited <- n_waited + (wait > 0)
+    appointment_start <- max(c(min(doctors), arrivals[i]))
+    appointment_end <- appointment_start + runif(1, 5, 20)
+    doctors[which.min(doctors)] <- appointment_end
+  }
+  
+  list(
+    n_patients = length(arrivals),
+    n_waited = n_waited,
+    time_waiting = time_waiting,
+    closing_time = pmax(max(doctors), t)
+  ) %>% return()
+    
+}
+
+arrivals(λ, t) %>% 
+  process(t)
+```
+
+To simulate the above many times, we'll use the `replicate` function. For convenience, we'll turn this into a `tibble`.
+
+```{r simulate}
+simulate <- function(iters, λ, t, n=100) {
+  iters %>% 
+    replicate(process(arrivals(λ, t, n), t)) %>% 
+    t() %>% 
+    as_tibble() %>% 
+    mutate_all(unlist)
+}
+
+sims <- simulate(1000, λ, t)
+```
+
+```{r simulate_table, echo=FALSE}
+sims %>% 
+  head() %>% 
+  kable(caption = "The first few simulations of a day at the practice.") %>% 
+  kable_styling(bootstrap_options = c("striped", "hover", "responsive"))
+```
+
+Finally, we can calculate the 50% intervals by applying the `quantile` function to each summary.
+
+```{r simulate_summary}
+sims_summary <- sims %>% 
+  gather(variable, value) %>% 
+  group_by(variable) %>% 
+  summarise(
+    q25 = quantile(value, 0.25),
+    q50 = quantile(value, 0.5),
+    q75 = quantile(value, 0.75),
+    simulations = n()
+  )
+```
+
+```{r simulate_summary_table, echo=FALSE}
+sims_summary %>% 
+  kable(caption = "The median and 50% interval for each summary statistic.") %>% 
+  kable_styling(bootstrap_options = c("striped", "hover", "responsive"))
+```
+
