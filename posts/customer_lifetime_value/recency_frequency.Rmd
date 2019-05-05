@@ -1,9 +1,9 @@
 ---
-title: "Recency-Frequency Lifetime Value"
+title: "Hierarchical Customer Lifetime Value"
 author: "Brian Callander"
 date: "2019-05-05"
 tags: customer lifetime value, recency frequency, hierarchical model, centred parameterisation, non-centred parameterisation, prior-predictive distribution, stan, e-bfmi, energy 
-tldr: "WIP"
+tldr: "We extend the basic CLV model to use hierarchical priors in two different ways: centred and non-centred parameterisations. I'm not aware of any other HMC-based implementations of this hierarchical CLV model, so we'll run some basic tests to check it's doing the right thing. More specifically, we'll fit it to a dataset drawn from the prior predictive distribution. The resulting fits pass the main diagnostic tests and the 90% posterior intervals capture about 91% of the true parameter values."
 always_allow_html: yes
 output: 
   md_document:
@@ -133,6 +133,7 @@ Let's recap on the story from last time. We have a 2-year old company that has g
 
 ```{r customers}
 set.seed(65130) # https://www.random.org/integers/?num=2&min=1&max=100000&col=5&base=10&format=html&rnd=new
+
 customers <- tibble(id = 1:1000) %>% 
   mutate(
     end = 2 * 365,
@@ -512,7 +513,7 @@ centred_cis <- centred_draws %>%
   filter(!str_detect(parameter, '__')) # exclude diagostic parameters
 ```
 
-The table below shows we managed to recover three of the hyperparameters. The `scales[2]` parameter was estimated slightly too low.
+The table below shows we managed to recover three of the hyperparameters. The `scales[2]` parameter was estimated slightly too high.
 
 ```{r calibration_hyper_centred}
 calibration_hyper <- hyper %>% 
@@ -607,8 +608,8 @@ noncentred_draws %>%
   geom_hex(aes(colour = ..ndensity.., fill = ..ndensity..)) +
   facet_wrap(~ str_glue("{parameter.y} vs {parameter.x}"), scales = 'free') +
   labs(
-    x = 'Left parameter',
-    y = 'Right parameter',
+    x = 'Right parameter',
+    y = 'Left parameter',
     title = 'Pairwise posterior densities',
     subtitle = 'of energy, lp, and hyperparameters',
     fill = 'Density'

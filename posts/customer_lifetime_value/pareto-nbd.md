@@ -205,7 +205,7 @@ clv <- function(n, mu, lambda, age=0) {
 
 ![](pareto-nbd_files/figure-markdown/clv_plot-1.svg)
 
-The probability of churning is can be estimated by the fraction of
+The probability of churning can be estimated by the fraction of
 `lifetime` draws that are above 0. For example, for a customer with an
 expected lifetime of 10 (i.e. $\mu = 0.1$) and a current age of 10, the
 probability of still being active is

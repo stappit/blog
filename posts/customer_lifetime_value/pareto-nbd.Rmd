@@ -175,7 +175,7 @@ clv(10000, mu = 0.1, lambda = 1, age = 10)  %>%
   )
 ```
 
-The probability of churning is can be estimated by the fraction of `lifetime` draws that are above 0. For example, for a customer with an expected lifetime of 10 (i.e. $\mu = 0.1$) and a current age of 10, the probability of still being active is
+The probability of churning can be estimated by the fraction of `lifetime` draws that are above 0. For example, for a customer with an expected lifetime of 10 (i.e. $\mu = 0.1$) and a current age of 10, the probability of still being active is
 
 ```{r p_active}
 mean(lifetime(100000, 0.1, 10) > 0)

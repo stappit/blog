@@ -10,8 +10,15 @@ tags: |
     customer lifetime value, recency frequency, hierarchical model, centred
     parameterisation, non-centred parameterisation, prior-predictive
     distribution, stan, e-bfmi, energy
-title: 'Recency-Frequency Lifetime Value'
-tldr: WIP
+title: Hierarchical Customer Lifetime Value
+tldr: |
+    We extend the basic CLV model to use hierarchical priors in two
+    different ways: centred and non-centred parameterisations. I'm not aware
+    of any other HMC-based implementations of this hierarchical CLV model,
+    so we'll run some basic tests to check it's doing the right thing. More
+    specifically, we'll fit it to a dataset drawn from the prior predictive
+    distribution. The resulting fits pass the main diagnostic tests and the
+    90% posterior intervals capture about 91% of the true parameter values.
 ---
 
 In a [previous post](./pareto-nbd.html), we described how a model of
@@ -56,6 +63,7 @@ customers.
 
 ``` {.r}
 set.seed(65130) # https://www.random.org/integers/?num=2&min=1&max=100000&col=5&base=10&format=html&rnd=new
+
 customers <- tibble(id = 1:1000) %>% 
   mutate(
     end = 2 * 365,
@@ -946,7 +954,7 @@ centred_cis <- centred_draws %>%
 
 The table below shows we managed to recover three of the
 hyperparameters. The `scales[2]` parameter was estimated slightly too
-low.
+high.
 
 ``` {.r}
 calibration_hyper <- hyper %>% 
