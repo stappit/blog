@@ -1,10 +1,10 @@
 ---
-always_allow_html: True
+always_allow_html: yes
 author: Brian Callander
 date: '2019-04-06'
 output:
   md_document:
-    preserve_yaml: True
+    preserve_yaml: yes
     variant: markdown
 tags: 'customer lifetime value, pareto-nbd, smc'
 title: 'Pareto-NBD Customer Lifetime Value'
@@ -18,7 +18,7 @@ Suppose you have a bunch of customers who make repeat purchases - some
 more frequenty, some less. There are a few things you might like to know
 about these customers, such as
 
--   which customers are still active (i.e. not yet churned) and likely
+-   which customers are still active (i.e. not yet churned) and likely
     to continue purchasing from you?; and
 -   how many purchases can you expect from each customer?
 
@@ -41,7 +41,7 @@ works, make some prior predictive simulations, and fit a version
 implemented in [Stan](https://mc-stan.org/).
 
 <!--more-->
-<div style="display:none">
+<div>
 
 $\DeclareMathOperator{\dbinomial}{Binomial}  \DeclareMathOperator{\dbern}{Bernoulli}  \DeclareMathOperator{\dpois}{Poisson}  \DeclareMathOperator{\dnorm}{Normal}  \DeclareMathOperator{\dt}{t}  \DeclareMathOperator{\dcauchy}{Cauchy}  \DeclareMathOperator{\dexp}{Exp}  \DeclareMathOperator{\duniform}{Uniform}  \DeclareMathOperator{\dgamma}{Gamma}  \DeclareMathOperator{\dinvgamma}{InvGamma}  \DeclareMathOperator{\invlogit}{InvLogit}  \DeclareMathOperator{\logit}{Logit}  \DeclareMathOperator{\ddirichlet}{Dirichlet}  \DeclareMathOperator{\dbeta}{Beta}$
 
@@ -49,6 +49,8 @@ $\DeclareMathOperator{\dbinomial}{Binomial}  \DeclareMathOperator{\dbern}{Bernou
 
 Data Generating Process
 -----------------------
+
+### Likelihood
 
 Let's describe the model first by simulation. Suppose we have a company
 that is 2 years old and a total of 2000 customers, $C$, that have made
@@ -166,6 +168,59 @@ t
 </tr>
 </tbody>
 </table>
+Given $\mu$ and $\lambda$, the CLV is calculated as follows. The
+remaining lifetime is the lifetime minus the age of the customer. So if
+the customer is estimated to have a lifetime of 1 year and has been a
+customer for 3 months already, then the remaining lifetime will be 9
+months.
+
+``` {.r}
+lifetime <- function(n, mu, age=0) {
+  rexp(n, mu) %>% 
+    `-`(age) %>% 
+    pmax(0) # remaining lifetime always >= 0
+}
+```
+
+The number of purchases in a given timeframe (within the customer's
+lifetime) is simply a poisson random variable.
+
+``` {.r}
+purchases <- function(n, lambda, time) {
+  rpois(n, lambda * time)
+}
+```
+
+To simulate the CLV, we just simulate a possible lifetime remaining,
+then simulate the number of puchases in that timeframe. Repeating many
+times gives us the distribution of the total number of purchases the
+customer is expected to make.
+
+``` {.r}
+clv <- function(n, mu, lambda, age=0) {
+  lifetime(n, mu, age) %>% 
+    purchases(n, lambda, .)
+} 
+```
+
+![](pareto-nbd_files/figure-markdown/clv_plot-1.svg)
+
+The probability of churning is can be estimated by the fraction of
+`lifetime` draws that are above 0. For example, for a customer with an
+expected lifetime of 10 (i.e. $\mu = 0.1$) and a current age of 10, the
+probability of still being active is
+
+``` {.r}
+mean(lifetime(100000, 0.1, 10) > 0)
+```
+
+    [1] 0.36881
+
+which is roughly $\exp(-0.1 * 10)$, the survival function of the
+exponential distribution.
+
+### Priors
+
 Now the priors. Typically, $\mu$ and $\lambda$ are given gamma priors,
 which we'll use too. However, the expected mean lifetime
 $\mathbb E (\tau) = \frac{1}{\mu}$ is easier to reason about than $\mu$,
@@ -421,10 +476,10 @@ $$
 \begin{align}
   \text{RHS}
   &=
-  \int_{\tau = T}^\infty \dpois(k \mid t\lambda) \cdot \dpois(0 \mid (\tau - t)\lambda) \cdot\dexp(\tau \mid \mu) d\tau
+  \int_{\tau = T}^\infty \dpois(k \mid t\lambda) \cdot \dpois(0 \mid (T - t)\lambda) \cdot\dexp(\tau \mid \mu) d\tau
   \\
   &=
-  \frac{(t\lambda)^k e^{-t\lambda}}{k!} e^{-(T-t)\lambda}\int_T^\infty \cdot\dexp(\tau \mid \mu) d\tau
+  \frac{(t\lambda)^k e^{-t\lambda}}{k!} e^{-(T-t)\lambda}\int_T^\infty \dexp(\tau \mid \mu) d\tau
   \\
   &=
   \frac{(t\lambda)^k e^{-T\lambda}}{k!} e^{-T\mu}
@@ -513,7 +568,7 @@ where $S$ is the survival function of the exponential distribution. In
 other words, either we censor at $t$ with probability $p$, or we censor
 at $T$ with probability $(1 - p)$. Note that
 
--   either decreasing the expected lifetime (i.e. increasing $\mu$) or
+-   either decreasing the expected lifetime (i.e. increasing $\mu$) or
     decreasing the purchase rate increases $p$;
 -   if $t \approx T$, then the censored distributions are approximately
     equal. The smaller $\lambda$ is, the closer the approximation has to
@@ -528,6 +583,93 @@ $$
 k \log\lambda - \log(\lambda + \mu) + \log\left(\mu e^{-t(\lambda + \mu)} + \lambda e^{-T(\lambda + \mu)} \right)
 .
 $$
+
+What does the likelihood "look like"?
+-------------------------------------
+
+Let's plot the likelihood to see how it changes as we vary $k$, $t$, and
+$T$. We'll use the following functions to do this.
+
+``` {.r}
+# calculate the likelihood
+likelihood <- function(mu, lambda, k, t, T) {
+    log_likelihood <- k * log(lambda) - log(lambda + mu) + log(mu * exp(-t * (lambda + mu)) + lambda * exp(-T * (lambda + mu)))
+    return(exp(log_likelihood))
+}
+
+# the grid to calculate values for
+grid <- crossing(
+  mu = seq(0.00001, 1, 0.01),
+  lambda = seq(0.00001, 1, 0.01)
+) 
+
+# plot it all
+plot_likelihood <- function(grid, k, t, T) {
+  grid %>% 
+    mutate(k = k, t = t, T = T) %>% 
+    mutate(likelihood = likelihood(mu, lambda, k, t, T)) %>% 
+    ggplot() +
+    aes(mu, lambda, fill = likelihood) +
+    geom_raster() +
+    geom_contour(aes(z = likelihood), alpha = 0.7) +
+    labs(
+      x = 'μ',
+      y = 'λ',
+      title = str_glue("Likelihood for k = {k}, t = {t}, T = {T}"),
+      subtitle = 'restricted to the unit interval',
+      fill = 'Likelihood'
+    )
+}
+```
+
+If $k = t = 0 \approx T$, then we have almost no information to inform
+our estimates (we would rely strongly on our priors in this case). We
+see that both large and small lifetimes are equally possible, and the
+parameter estimates are approximately independent of one another.
+
+``` {.r}
+grid %>% 
+  plot_likelihood(k = 0, t = 0, T = 0.1) 
+```
+
+![](pareto-nbd_files/figure-markdown/unnamed-chunk-1-1.svg)
+
+Adding some observation time changes it up a little. We can increase the
+purchase rate without changing the likelihood if we also decrease the
+lifetime (= increase $\mu$). This trade-off is almost linear. There are
+almost always many customers that haven't made a second purchase yet, so
+this case is likely important to deal with well.
+
+``` {.r}
+grid %>% 
+  plot_likelihood(k = 0, t = 0, T = 12) 
+```
+
+![](pareto-nbd_files/figure-markdown/unnamed-chunk-2-1.svg)
+
+If, on the other hand, we do observe some purchases in this period, the
+likelihood quickly shrinks around the average purchase rate. Likewise,
+the expected lifetime clings around the larger values.
+
+``` {.r}
+grid %>% 
+  plot_likelihood(k = 3, t = 12, T = 12) 
+```
+
+![](pareto-nbd_files/figure-markdown/unnamed-chunk-3-1.svg)
+
+Once a substantial length of time ellapses without any more purchases,
+we see the MLE estimate for $\mu$ move away from small values. This
+makes sense since we would otherwise have observed more recent
+purchases. The estimate for $\mu$ doesn't increase too much though since
+we know the lifetime is at least 12.
+
+``` {.r}
+grid %>% 
+  plot_likelihood(k = 3, t = 12, T = 100000) 
+```
+
+![](pareto-nbd_files/figure-markdown/unnamed-chunk-4-1.svg)
 
 Stan implementation
 -------------------
