@@ -15,7 +15,7 @@ Here's my solution to exercise 8, chapter 2, of [Gelman's](https://andrewgelman.
 
 <!--more-->
 
-<div style="display:none">
+<div>
   $\DeclareMathOperator{\dbinomial}{binomial}
    \DeclareMathOperator{\dbern}{Bernoulli}
    \DeclareMathOperator{\dnorm}{normal}
@@ -56,7 +56,7 @@ $$
   
 So $\theta \mid \bar y ~ \dnorm \left( \frac{60(3 + 10n)}{1 + 4n}, \frac{40}{\sqrt{1 + 4n}} \right)$.
 
-It follows from the calculations shown in the book that the posterior predictive distribution is $\tilde y \mid y \sim \dnorm(\mu, \sigma + 20)$.
+It follows from the calculations shown in the book that the posterior predictive distribution is $\tilde y \mid y \sim \dnorm(\mu, \sqrt{\sigma^2 + 400})$.
 
 We can obtain 95% posterior intervals as follows.
 
@@ -67,14 +67,14 @@ sigma <- function(n) 40 / sqrt(1 + 4 * n)
 percentiles <- c(0.05, 0.95)
 
 theta_posterior_interval <- qnorm(percentiles, mu(10), sigma(10))
-y_posterior_interval <- qnorm(percentiles, mu(10), sigma(10) + 20)
+y_posterior_interval <- qnorm(percentiles, mu(10), sqrt(sigma(10)^2 + 400))
 ```
 
 With a sample of size of 10, we get θ ϵ [`r signif(theta_posterior_interval, digits = 4)`] and $\tilde y$ ϵ [`r signif(y_posterior_interval, digits = 4)`].
 
 ```{r}
 theta_posterior_interval <- qnorm(percentiles, mu(100), sigma(100))
-y_posterior_interval <- qnorm(percentiles, mu(100), sigma(100) + 20)
+y_posterior_interval <- qnorm(percentiles, mu(100), sqrt(sigma(100)^2 + 400))
 ```
 
 With a sample of size of 100, we get θ ϵ [`r signif(theta_posterior_interval, digits = 4)`] and $\tilde y$ ϵ [`r signif(y_posterior_interval, digits = 4)`].
