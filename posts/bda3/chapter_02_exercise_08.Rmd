@@ -54,7 +54,7 @@ $$
 $$
   
   
-So $\theta \mid \bar y ~ \dnorm \left( \frac{60(3 + 10n)}{1 + 4n}, \frac{40}{\sqrt{1 + 4n}} \right)$.
+So $\theta \mid \bar y \sim \dnorm \left( \frac{60(3 + 10n)}{1 + 4n}, \frac{40}{\sqrt{1 + 4n}} \right)$. When $n = 0$ this is exactly the prior, and when $n = \infty$ this is 150 (the observed mean) with zero variance.
 
 It follows from the calculations shown in the book that the posterior predictive distribution is $\tilde y \mid y \sim \dnorm(\mu, \sqrt{\sigma^2 + 400})$.
 
@@ -70,7 +70,8 @@ theta_posterior_interval <- qnorm(percentiles, mu(10), sigma(10))
 y_posterior_interval <- qnorm(percentiles, mu(10), sqrt(sigma(10)^2 + 400))
 ```
 
-With a sample of size of 10, we get θ ϵ [`r signif(theta_posterior_interval, digits = 4)`] and $\tilde y$ ϵ [`r signif(y_posterior_interval, digits = 4)`].
+With a sample of size of 10, we get θ ϵ [`r signif(theta_posterior_interval, digits = 4)`] and $\tilde y$ ϵ [`r signif(y_posterior_interval, digits = 4)`]. 
+
 
 ```{r}
 theta_posterior_interval <- qnorm(percentiles, mu(100), sigma(100))
@@ -78,3 +79,12 @@ y_posterior_interval <- qnorm(percentiles, mu(100), sqrt(sigma(100)^2 + 400))
 ```
 
 With a sample of size of 100, we get θ ϵ [`r signif(theta_posterior_interval, digits = 4)`] and $\tilde y$ ϵ [`r signif(y_posterior_interval, digits = 4)`].
+
+Both of these posterior intervals for $\theta$ are very similar to the frequentist confidence intervals, especially in the case $n = 100$. 
+
+```{r}
+qnorm(percentiles, 150, 20 / sqrt(10))
+qnorm(percentiles, 150, 20 / sqrt(100))
+```
+
+We would expect them to become more similar as $n$ increases, because both means and standard deviations converge to the same values for large $n$.

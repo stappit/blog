@@ -59,7 +59,9 @@ $$
 $$
 
 So
-$\theta \mid \bar y ~ \dnorm \left( \frac{60(3 + 10n)}{1 + 4n}, \frac{40}{\sqrt{1 + 4n}} \right)$.
+$\theta \mid \bar y \sim \dnorm \left( \frac{60(3 + 10n)}{1 + 4n}, \frac{40}{\sqrt{1 + 4n}} \right)$.
+When $n = 0$ this is exactly the prior, and when $n = \infty$ this is
+150 (the observed mean) with zero variance.
 
 It follows from the calculations shown in the book that the posterior
 predictive distribution is
@@ -87,3 +89,22 @@ y_posterior_interval <- qnorm(percentiles, mu(100), sqrt(sigma(100)^2 + 400))
 
 With a sample of size of 100, we get θ ϵ \[146.8, 153.4\] and $\tilde y$
 ϵ \[117, 183.1\].
+
+Both of these posterior intervals for $\theta$ are very similar to the
+frequentist confidence intervals, especially in the case $n = 100$.
+
+``` {.r}
+qnorm(percentiles, 150, 20 / sqrt(10))
+```
+
+    ## [1] 139.597 160.403
+
+``` {.r}
+qnorm(percentiles, 150, 20 / sqrt(100))
+```
+
+    ## [1] 146.7103 153.2897
+
+We would expect them to become more similar as $n$ increases, because
+both means and standard deviations converge to the same values for large
+$n$.
