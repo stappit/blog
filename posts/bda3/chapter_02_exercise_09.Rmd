@@ -15,7 +15,7 @@ Here's my solution to exercise 9, chapter 2, of [Gelman's](https://andrewgelman.
 
 <!--more-->
 
-<div style="display:none">
+<div>
   $\DeclareMathOperator{\dbinomial}{binomial}
    \DeclareMathOperator{\dbern}{Bernoulli}
    \DeclareMathOperator{\dnorm}{normal}
@@ -59,11 +59,25 @@ $$
   \frac{12}{25}\frac{100}{9}
   \\
   &=
-  4,
+  \frac{16}{9},
 \end{align}
 $$
 
-which implies that $\beta = \frac{2}{5}$. Thus $\alpha = \frac{3}{5}$. Since both parameters are below 1, we see maxima near 0 and 1.
+which implies that $\beta = \frac{2}{3}$. Thus $\alpha = 1$. Let's check we've done the maths correctly.
+
+```{r}
+α <- 1
+β <- 2 / 3
+
+list(
+  'mean_diff' = 3 / 5 - α / (α + β),
+  'variance_diff' = 9 / 100 - α * β / ((α + β)^2 * (α + β + 1))
+)
+```
+
+The value `1e-16` is computer-speak for 0.
+
+Since $\beta < 1 <= \alpha$, we see one maximum at 1.
 
 ```{r, include=FALSE}
 knitr::opts_chunk$set(
@@ -72,7 +86,7 @@ knitr::opts_chunk$set(
   message = FALSE,
   warning = FALSE,
   error = TRUE,
-  cache = TRUE
+  cache = FALSE
 )
 
 library(tidyverse)
@@ -81,8 +95,6 @@ theme_set(theme_bw())
 
 
 ```{r prior}
-α <- 3 / 5
-β <- 2 / 5
 
 tibble(x = seq(0, 1, 0.001), y = dbeta(x, α, β)) %>% 
   ggplot() +
@@ -92,7 +104,7 @@ tibble(x = seq(0, 1, 0.001), y = dbeta(x, α, β)) %>%
     x = 'x',
     y = 'beta(x | α, β)',
     title = 'Beta prior with mean 0.3 and standard deviation 0.6',
-    subtitle = str_glue('α = {α}, β = {β}')
+    subtitle = str_glue('α = {α}, β = {signif(β, 3)}')
   )
   
 ```

@@ -1,10 +1,10 @@
 ---
-always_allow_html: True
+always_allow_html: yes
 author: Brian Callander
 date: '2018-08-29'
 output:
   md_document:
-    preserve_yaml: True
+    preserve_yaml: yes
     variant: markdown
 tags: 'bda chapter 2, solutions, bayes, beta, prior sensitivity'
 title: BDA3 Chapter 2 Exercise 9
@@ -21,7 +21,7 @@ some of the exercises on the [book's
 webpage](http://www.stat.columbia.edu/~gelman/book/).
 
 <!--more-->
-<div style="display:none">
+<div>
 
 $\DeclareMathOperator{\dbinomial}{binomial}  \DeclareMathOperator{\dbern}{Bernoulli}  \DeclareMathOperator{\dnorm}{normal}  \DeclareMathOperator{\dgamma}{gamma}  \DeclareMathOperator{\invlogit}{invlogit}  \DeclareMathOperator{\logit}{logit}  \DeclareMathOperator{\dbeta}{beta}$
 
@@ -63,17 +63,34 @@ $$
   \frac{12}{25}\frac{100}{9}
   \\
   &=
-  4,
+  \frac{16}{9},
 \end{align}
 $$
 
-which implies that $\beta = \frac{2}{5}$. Thus $\alpha = \frac{3}{5}$.
-Since both parameters are below 1, we see maxima near 0 and 1.
+which implies that $\beta = \frac{2}{3}$. Thus $\alpha = 1$. Let's check
+we've done the maths correctly.
 
 ``` {.r}
-α <- 3 / 5
-β <- 2 / 5
+α <- 1
+β <- 2 / 3
 
+list(
+  'mean_diff' = 3 / 5 - α / (α + β),
+  'variance_diff' = 9 / 100 - α * β / ((α + β)^2 * (α + β + 1))
+)
+```
+
+    ## $mean_diff
+    ## [1] -1.110223e-16
+    ## 
+    ## $variance_diff
+    ## [1] -1.387779e-17
+
+The value `1e-16` is computer-speak for 0.
+
+Since $\beta < 1 <= \alpha$, we see one maximum at 1.
+
+``` {.r}
 tibble(x = seq(0, 1, 0.001), y = dbeta(x, α, β)) %>% 
   ggplot() +
   aes(x, y) +
@@ -82,7 +99,7 @@ tibble(x = seq(0, 1, 0.001), y = dbeta(x, α, β)) %>%
     x = 'x',
     y = 'beta(x | α, β)',
     title = 'Beta prior with mean 0.3 and standard deviation 0.6',
-    subtitle = str_glue('α = {α}, β = {β}')
+    subtitle = str_glue('α = {α}, β = {signif(β, 3)}')
   )
 ```
 
