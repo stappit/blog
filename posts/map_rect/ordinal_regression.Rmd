@@ -3,7 +3,7 @@ title: "Speeding up Bayesian sampling"
 author: "Brian Callander"
 date: "2019-08-08"
 tags: stan, map_rect, within-chain parallelisation, threading, ordinal regression
-tldr: "We implement threading for an ordinal regression model with one covariate in Stan. The mapped model allows a different number of observations per shard."
+tldr: "We implement threading for an ordinal regression model with one covariate in Stan. This gives us a 6x speedup. The mapped model allows for a different number of observations per shard. The indexing is drastically simplified by setting up one shard per factor level."
 always_allow_html: yes
 output:
   md_document:
@@ -11,26 +11,9 @@ output:
     preserve_yaml: yes
 ---
 
-Fitting a full Bayesian model can be slow, especially with a large dataset. For example, it'd be great to analyse the climate crisis questions in the [European Social Survey (ESS)](https://www.europeansocialsurvey.org/data/round-index.html), which typically has around 45,000 respondents from around Europe on a range of socio-political questions. There are two main ways of parallelising your Bayesian model in Stan: between-chain parallelisation and within-chain parallelisation. The first of these is very easy to implement (`chains = 4`, `cores = 4`) - it simply runs the algorithm once on each core and pools the posterior samples at the end. The second method is more complicated as it requires a non-trivial modification to the Stan model, but can bring with it large speedups if you have the cores available. This post is about within-chain parallelisation.
+Fitting a full Bayesian model can be slow, especially with a large dataset. For example, it'd be great to analyse the climate crisis questions in the [European Social Survey (ESS)](https://www.europeansocialsurvey.org/data/round-index.html), which typically has around 45,000 respondents from around Europe on a range of socio-political questions. There are two main ways of parallelising your Bayesian model in Stan: between-chain parallelisation and within-chain parallelisation. The first of these is very easy to implement (`chains = 4`, `cores = 4`) - it simply runs the algorithm once on each core and pools the posterior samples at the end. The second method is more complicated as it requires a non-trivial modification to the Stan model, but can bring with it large speedups if you have the cores available. In this post we'll get a >5x speedup of ordinal regression using within-chain parallelisation.
 
 <!--more-->
-
-<div>
- \DeclareMathOperator{\dbinomial}{Binomial}
-  \DeclareMathOperator{\dbern}{Bernoulli}
-  \DeclareMathOperator{\dpois}{Poisson}
-  \DeclareMathOperator{\dnorm}{Normal}
-  \DeclareMathOperator{\dt}{t}
-  \DeclareMathOperator{\dcauchy}{Cauchy}
-  \DeclareMathOperator{\dexponential}{Exp}
-  \DeclareMathOperator{\duniform}{Uniform}
-  \DeclareMathOperator{\dgamma}{Gamma}
-  \DeclareMathOperator{\dinvgamma}{InvGamma}
-  \DeclareMathOperator{\invlogit}{InvLogit}
-  \DeclareMathOperator{\logit}{Logit}
-  \DeclareMathOperator{\ddirichlet}{Dirichlet}
-  \DeclareMathOperator{\dbeta}{Beta}
-</div>
 
 ```{r setup, include=FALSE}
 knitr::opts_chunk$set(
@@ -38,12 +21,14 @@ knitr::opts_chunk$set(
   comment = NA,
   message = FALSE,
   warning = FALSE,
-  error = TRUE
-  # cache = TRUE,
-  # dev = "png"
+  error = TRUE,
+  cache = TRUE,
+  dev = "png",
+  dpi = 600
 )
 
 library(tidyverse)
+library(scales)
 library(here)
 
 library(kableExtra)
@@ -58,7 +43,7 @@ rstan_options(auto_write = TRUE)
 ```
 
 
-I'll assume you are somewhat familiar with [McElreath's introduction with cmdstan](https://github.com/rmcelreath/cmdstan_map_rect_tutorial) and/or with [Ignacio's introduction with rstan](https://blog.ignacio.website/post/multithreading-and-map-reduce-in-stan/). I'll implement a mapped version of ordinal regression with one (factor) covariate using similar ideas. The main difference is that I'll have a shard set up for each distinct level of my factor, and each shard will receive a different number of datapoints. This is my first attempt at making sense of this, so use at your own risk.
+I'll assume you are somewhat familiar with [McElreath's introduction with cmdstan](https://github.com/rmcelreath/cmdstan_map_rect_tutorial), with [Ignacio's introduction with rstan](https://blog.ignacio.website/post/multithreading-and-map-reduce-in-stan/), and/or with the [Stan user guide](https://mc-stan.org/docs/2_19/stan-users-guide/map-reduce-chapter.html). We'll implement a mapped version of ordinal regression with one (factor) covariate using similar ideas. The main difference is that we'll have a shard set up for each distinct level of the factor, and each shard will receive a different number of datapoints. This is my first attempt at making sense of this, so use at your own risk.
 
 **Important note**: there is [a bug](https://github.com/stan-dev/math/issues/1248#issuecomment-494350329) in the `ordered_logistic_lpmf` function in stan 2.19.2, the version I currently have installed. Until the fixed version in stan 2.20, I went for the [easy fix](https://discourse.mc-stan.org/t/ordered-logistic-lpmf/9799/2). 
 
@@ -100,22 +85,22 @@ Now we're all setup for threading.
 
 ## Generate the data
 
-Let's generate observations from the prior predictive distribution. Skip this if you're just interested in the fitting. We'll use [the model](./models/ordinal_regression.stan) described in the [user guide](https://mc-stan.org/docs/2_18/stan-users-guide/ordered-logistic-section.html). 
+Let's generate observations from the prior predictive distribution. Skip this section if you're just interested in the parallelisation. We'll use [the model](./models/ordinal_regression_betancourt.stan) described in [Michael Betancourt's](https://www.patreon.com/betanalpha/posts) [case study](https://betanalpha.github.io/assets/case_studies/ordinal_regression.html).
 
 ```{r dgp}
-m_sim <- "models/ordinal_regression_sim.stan" %>% 
+m_sim <- "models/ordinal_regression_sim_betancourt.stan" %>% 
   here() %>% 
   stan_model()
 ```
 
-We'll generate 10,000 observations, where the only covariate is called `factr`, of which we have around 100 unique values. Notice that we will end up with a different number of observations for each factor of `factr`.
+We'll generate 10,000 observations, where the only covariate is called `factr`, of which we have around 100 unique values. Notice that we will end up with a different number of observations for each level of `factr`.
 
 ```{r data}
 set.seed(12096)
 
 N <- 10000 # number of observations
 K <- 5     # number of ordinal outcomes
-L <- 100   # number of unique factrs in our factor
+L <- 100   # number of unique levels in our factor
 
 # the covariates
 df_sim <- 1:L %>% 
@@ -129,12 +114,11 @@ data_sim <- list(
   N = N,
   K = K,
   L = L,
-  factr = df_sim %>% model.matrix(~ 0 + factr, .), # 1-hot encoding
+  factr = model.matrix(~ 1 + factr, df_sim)[, 2:L], # contrast encoding
   # hyperparameters
   factr_mu = 0,
   factr_sd = 1,
-  cutpoint_mu = 0,
-  cutpoint_sd = 2
+  alpha = c(1, 2, 4, 2, 1)
 )
 ```
 
@@ -148,7 +132,7 @@ fit_sim <- m_sim %>%
     data = data_sim,
     iter = 1,
     chains = 1,
-    seed = 22484
+    seed = 43484
   )
 
 # extract the parameters and observations
@@ -172,24 +156,32 @@ df <- df_sim %>%
   ) %>% 
   arrange(factr)
 
-# add outcome
+# as a list for stan
 data <- data_sim %>% 
   list_modify(y = df$y)
 ```
 
-```{r data_table, echo=FALSE}
+```{r data_plot, echo=FALSE, fig.width=8, fig.height=5, fig.cap="Counts of each outcome variable"}
 df %>% 
-  sample_n(6) %>% 
-  kable(caption = "A sample from our dataset.") %>% 
-  kable_styling()
+  count(y) %>% 
+  ggplot() +
+  aes(y, n, fill = ordered(y)) +
+  geom_col() +
+  labs(
+    title = "The number of observations of each outcome",
+    x = 'Outcome, y',
+    y = 'Number of observations'
+  ) +
+  guides(fill = FALSE) +
+  NULL
 ```
 
 ## The unmapped model
 
-Let's start with a standard [ordinal regression model](./models/ordinal_regression.stan) `m` and time how long it takes to fit to our dataset.
+Let's check that [Betancourt's model](./models/ordinal_regression.stan) `m` passes some standard diagnostic tests on our data and time how long it takes to fit.
 
 ```{r model}
-m <- "models/ordinal_regression.stan" %>% 
+m <- "models/ordinal_regression_betancourt.stan" %>% 
   here() %>% 
   stan_model()
 ```
@@ -200,7 +192,7 @@ fit <- m %>%
   sampling(
     data = data,
     chains = 1,
-    warmup = 1000,
+    warmup = 500,
     iter = 2000,
     seed = 14031
   )
@@ -208,11 +200,36 @@ end <- Sys.time()
 duration <- end - start
 ```
 
-The fitting took `r as.numeric(duration, units = 'mins')` minutes.
+The fitting took `r signif(as.numeric(duration, units = 'mins'), 2)` minutes. 
 
-The cutpoints have been recovered well.
+Let's check the usual diagnostics.
 
-```{r cutpoint_posterior, echo=FALSE}
+```{r diagnostics, message=TRUE, warning=TRUE, error=TRUE}
+rstan::check_hmc_diagnostics(fit)
+```
+
+The ESS and Rhat values also look good.
+
+```{r ess_rhat, echo=FALSE}
+fit %>% 
+  gather_draws(c[], beta[]) %>% 
+  summarise(
+    rhat = Rhat(.value),
+    ess_bulk = ess_bulk(.value),
+    ess_tail = ess_tail(.value)
+  ) %>% 
+  group_by(.variable) %>% 
+  summarise_all(lst(min, max)) %>% 
+  gather(diagnostic, value, -.variable) %>% 
+  arrange(.variable, diagnostic) %>% 
+  rename(variable = .variable) %>% 
+  kable(caption = "Max/min of ESS and Rhat diagnostics of the unmapped model", digits = 2) %>% 
+  kable_styling(bootstrap_options = c("striped", "hover", "responsive"))
+```
+
+The cutpoints have been estimated slightly too low, but within reasonable bounds.
+
+```{r cutpoint_posterior, echo=FALSE, fig.cap="Posterior distribution of cutpoints", fig.width=8, fig.height=5}
 draws_c <- fit %>% 
   spread_draws(c[cutpoint_id]) 
 
@@ -232,32 +249,22 @@ draws_c %>%
   NULL
 ```
 
-The 95% intervals capture the true value in 94% of cases, which seems well calibrated.
-
 ```{r effect_posterior, echo=FALSE}
 draws_beta <- fit %>% 
   spread_draws(beta[factr_id]) 
 
-draws_beta %>% 
-  mean_qi() %>% 
-  mutate(ground_truth = effects[factr_id], hit = .lower <= ground_truth & ground_truth <= .upper) %>% 
-  ggplot(aes(x = reorder(factr_id, ground_truth), y = beta, ymin = .lower, ymax = .upper, colour = hit)) +
-  geom_linerange() +
-  geom_point(aes(y = ground_truth)) +
-  labs(
-    x = 'Level',
-    y = 'Effect, β',
-    colour = 'Hit?',
-    title = "Posterior 95% intervals for each level"
-  ) +
-  coord_flip() +
-  theme(
-    axis.ticks.y = element_blank(),
-    axis.text.y = element_blank(),
-    # axis.title.y = element_blank()
-  ) +
-  NULL
+calibration <- draws_beta %>% 
+  mean_qi(.width = 0.5) %>% 
+  mutate(
+    ground_truth = effects[factr_id], 
+    hit = .lower <= ground_truth & ground_truth <= .upper
+  ) %>% 
+  summarise(calibration = mean(hit)) %>% 
+  pull() %>% 
+  percent()
 ```
+
+Around `r calibration` of the 100 50% intervals for β contained the true values.
 
 ## The mapped model
 
@@ -269,7 +276,7 @@ m_mapped <- "models/ordinal_regression_mapped.stan" %>%
   stan_model()
 ```
 
-We'll set up a shard for every level of our factor. The function `lp` for calculating the log-posterior on one shard looks like this.
+We'll set up a shard for every level of our factor. The function `lp` for calculating the log-posterior on one shard looks like this. The first entry in our integer array `xi` is the number of observations `M` for this level/shard. The data we need is then contained in the next `M` entries of `xi`. The cutpoints are the only global parameters we'll use here. The estimated effect for this level is given by `beta`, the only local parameter for this shard. The log-likelihood `ll` is then calculated as usual.
 
 ```
 functions {
@@ -286,9 +293,8 @@ functions {
 }
 ```
 
-The first entry in our integer array `xi` is the number of observations `M` for this level/shard. The data we need is then contained in the next `M` entries of `xi`. The cutpoints are the only global parameters we'll use here. The estimated effect for this level is given by `beta`, the only local parameter for this shard. The log-likelihood `ll` is then calculated as usual.
 
-The shards are set up in the transformed data section. Since we have a shard for every level, we simply index the shards using the levels. Note that we have simplified the stan code by assuming the data are sorted by the levels of the factor. Indeed, we iterate over our observations in order, and reset the index `j` within the shard whenever the factor changes. The first entry of each shard is reserved for the number of datapoints used in that shard, which is why `j` starts at 2.
+The shards are set up in the transformed data section. Since we have a shard for every level, we simply index the shards using the levels. This makes it very easy to keep track of which shard gets the next datapoint.  The first entry of each shard is reserved for the number of datapoints used in that shard. To keep track of where to put the next datapoint within a shard, we setup the array `j`. This starts at 2 because position 1 is reserved for the number of datapoints in the shard. Everytime we add a datapoint to a shard, we increment that shard's entry in `j` so that the next datapoint lands in the correct place.
 
 ```
 transformed data {
@@ -301,16 +307,9 @@ transformed data {
 
   int<lower = 1> j = 2; 
   for (i in 1:N) {
-
-    if (i == 1) {
-      j = 2;
-    } else if (factr[i - 1] != factr[i]) {
-      j = 2;
-    } else {
-      j += 1;
-    }
-
-    xi[factr[i], j] = y[i];
+    int shard = factr[i];
+    xi[shard, j[shard]] = y[i];
+    j[shard] += 1;
   }
 
   xi[, 1] = counts;
@@ -328,7 +327,7 @@ fit_mapped <- m_mapped %>%
   sampling(
     data = data %>% list_modify(factr = df$factr),
     chains = 1,
-    warmup = 1000,
+    warmup = 500,
     iter = 2000,
     seed = 78176
   )
@@ -337,9 +336,41 @@ end_mapped <- Sys.time()
 duration_mapped <- end_mapped - start_mapped
 ```
 
-The fitting took `r as.numeric(duration_mapped, units = 'secs')` seconds. This is a `r signif(as.numeric(duration, units = 'secs') / as.numeric(duration_mapped, units = 'secs'), 2)`-fold speedup! More importantly, the cutpoints seem to be recovered well.
+```{r speedup, include=FALSE}
+speedup <- as.numeric(duration, units = 'secs') / as.numeric(duration_mapped, units = 'secs')
+```
 
-```{r cutpoint_posterior_mapped, echo=FALSE}
+
+The fitting took `r as.numeric(duration_mapped, units = 'secs')` seconds. This is a `r signif(speedup, 2)`-fold speedup! 
+
+The HMC diagnostics look good.
+
+```{r diagnostics_mapped, message=TRUE, warning=TRUE, error=TRUE}
+rstan::check_hmc_diagnostics(fit_mapped)
+```
+
+Rhat and ESS also look good.
+
+```{r ess_rhat_mapped, echo=FALSE}
+fit_mapped %>% 
+  gather_draws(c[], beta[]) %>% 
+  summarise(
+    rhat = Rhat(.value),
+    ess_bulk = ess_bulk(.value),
+    ess_tail = ess_tail(.value)
+  ) %>% 
+  group_by(.variable) %>% 
+  summarise_all(lst(min, max)) %>% 
+  gather(diagnostic, value, -.variable) %>% 
+  arrange(.variable, diagnostic) %>% 
+  rename(variable = .variable) %>% 
+  kable(caption = "Max/min of ESS and Rhat diagnostics of the mapped model", digits = 2) %>% 
+  kable_styling(bootstrap_options = c("striped", "hover", "responsive"))
+```
+
+The posteriors of the cutpoints are much the same as before.
+
+```{r cutpoint_posterior_mapped, echo=FALSE, fig.cap="Posterior distribution of cutpoints using the mapped model", fig.width=8, fig.height=5}
 draws_c_mapped <- fit_mapped %>% 
   spread_draws(c[cutpoint_id]) 
 
@@ -359,55 +390,60 @@ draws_c_mapped %>%
   NULL
 ```
 
-The level-effects also still seem well-calibrated.
 
 ```{r effect_posterior_mapped, echo=FALSE}
 draws_beta_mapped <- fit_mapped %>% 
   spread_draws(beta[factr_id]) 
 
-draws_beta_mapped %>% 
-  mean_qi() %>% 
-  mutate(ground_truth = effects[factr_id], hit = .lower <= ground_truth & ground_truth <= .upper) %>% 
-  ggplot(aes(x = reorder(factr_id, ground_truth), y = beta, ymin = .lower, ymax = .upper, colour = hit)) +
-  geom_linerange() +
-  geom_point(aes(y = ground_truth)) +
-  labs(
-    x = 'Level',
-    y = 'Effect, β',
-    colour = 'Hit?',
-    title = "Posterior 95% intervals for each level"
-  ) +
-  coord_flip() +
-  theme(
-    axis.ticks.y = element_blank(),
-    axis.text.y = element_blank(),
-    # axis.title.y = element_blank()
-  ) +
-  NULL
+calibration_mapped <- draws_beta_mapped %>% 
+  mean_qi(.width = 0.5) %>% 
+  mutate(
+    ground_truth = effects[factr_id], 
+    hit = .lower <= ground_truth & ground_truth <= .upper
+  ) %>% 
+  summarise(calibration = mean(hit)) %>% 
+  pull() %>% 
+  percent()
 ```
 
-Comparing the two estimates we have for every level, it seems the mapped estimates are ever-so-slightly smaller than the unmapped estimates.
+The level-effects are as well-calibrated as before, with around `r calibration` of the 100 50% intervals for β containing the true values.
+
+We can measure the similarity of the estimates in two ways:
+
+1. the absolute difference in the point estimates; and
+2. the ratio between the length of the overlap of the 50% intervals and the shortest 50% interval.
+
+In each case the estimates look roughly the same, especially with respect to the ratio metric.
 
 ```{r comparison, echo=FALSE}
-draws_beta %>% 
-  mean_qi() %>% 
-  inner_join(draws_beta_mapped %>% mean_qi(), by = 'factr_id') %>% 
-  mutate(increase = beta.y - beta.x) %>% 
-  summarise(
-    min(increase),
-    median(increase),
-    mean(increase),
-    max(increase)
-  ) %>% 
+comparisons <- draws_beta %>% 
+  mean_qi(.width = 0.5) %>% 
+  inner_join(draws_beta_mapped %>% mean_qi(.width = 0.5), by = 'factr_id') %>% 
+  mutate(
+    change = abs(beta.y - beta.x),
+    
+    length.x = abs(.upper.x - .lower.x),
+    length.y = abs(.upper.y - .lower.y),
+    length = pmin(length.x, length.y),
+    
+    lower = pmax(.lower.x, .lower.y),
+    upper = pmin(.upper.x, .upper.y),
+    overlap = pmax(0, upper - lower),
+    ratio = overlap / length
+  ) 
+
+comparisons %>% 
+  select(change, ratio) %>% 
+  summarise_all(lst(min, median, mean, max)) %>% 
   gather(metric, value) %>% 
-  kable(caption = "Summary statistics for increase in mapped estimates") %>% 
-  kable_styling()
+  arrange(metric) %>% 
+  kable(caption = "Summary statistics for ratio in mapped estimates", digits = 4) %>% 
+  kable_styling(bootstrap_options = c("striped", "hover", "responsive"))
 ```
 
 ## Next steps
 
-I'm fairly happy with the speedup seen here. Actually, I'm mostly happy I got it working at all. It's entirely possible that creating 100 shards with only 4 threads to run them on isn't the most efficient way to use threading, but I'll keep doing it like this until somebody tells me it's stupid. Higher up in my priorities right now are:
+I'm fairly happy with the speedup seen here. Actually, I'm mostly happy I got it working at all. It's entirely possible that creating 100 shards with only 4 threads to run them on isn't the most efficient way to use threading, but I'll keep doing it like this until there's a more convenient way to do it. Higher up in my priorities right now are:
 
-* putting a hierarchical prior on the factor; e.g. for use in [MRP](https://arxiv.org/abs/1906.11323);
 * adding more covariates, especially factors; and
-* use [Betancourt's](https://www.patreon.com/betanalpha/posts) [principled prior model](https://betanalpha.github.io/assets/case_studies/ordinal_regression.html).
+* putting a hierarchical prior on the factor; e.g. for use in [MRP](https://arxiv.org/abs/1906.11323).

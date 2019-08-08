@@ -18,6 +18,31 @@ functions {
     }
     return counts;
   }
+
+  real induced_dirichlet_lpdf(vector c, vector alpha, real phi) {
+    int K = num_elements(c) + 1;
+    vector[K - 1] sigma = inv_logit(phi - c);
+    vector[K] p;
+    matrix[K, K] J = rep_matrix(0, K, K);
+
+    // Induced ordinal probabilities
+    p[1] = 1 - sigma[1];
+    for (k in 2:(K - 1))
+      p[k] = sigma[k - 1] - sigma[k];
+    p[K] = sigma[K - 1];
+
+    // Baseline column of Jacobian
+    for (k in 1:K) J[k, 1] = 1;
+
+    // Diagonal entries of Jacobian
+    for (k in 2:K) {
+      real rho = sigma[k - 1] * (1 - sigma[k - 1]);
+      J[k, k] = - rho;
+      J[k - 1, k] = rho;
+    }
+
+    return dirichlet_lpdf(p | alpha) + log_determinant(J);
+  }
 }
 
 data {
@@ -28,9 +53,8 @@ data {
   int<lower = 1, upper = L> factr[N]; // Numerical IDs of each level
 
   real factr_mu;
-  real factr_sd;
-  real cutpoint_mu;
-  real cutpoint_sd;
+  real<lower = 0> factr_sd;
+  vector<lower = 0>[K] alpha;
 }
 
 transformed data {
@@ -42,28 +66,17 @@ transformed data {
   int<lower = 1> M = max(counts) + 1; // shard size
 
   int xi[L, max(counts) + 1];  // integer array
-  real xr[L, max(counts) + 1]; // real array
+  real xr[L, max(counts) + 1]; // real array (unused)
 
-  int<lower = 1> j = 2; // index used in shard definition below
+  int<lower = 1> j[L] = rep_array(2, L); // index used in shard definition below
+  xi[, 1] = counts; // first entry in each shard defines number of datapoints in the shard
 
   // define shards
-  // assume factrs are sorted
-  // (more generally: if i < j < k and factr[i] = factr[k], then factr[i] = factr[j])
   for (i in 1:N) {
-
-    if (i == 1) {
-      j = 2;
-    } else if (factr[i - 1] != factr[i]) {
-      j = 2;
-    } else {
-      j += 1;
-    }
-
-    xi[factr[i], j] = y[i];
+    int shard = factr[i];
+    xi[shard, j[shard]] = y[i];
+    j[shard] += 1;
   }
-
-  // first entry in each shard defines number of datapoints in the shard
-  xi[, 1] = counts;
 
   // all other entries are left undefined
   // e.g. xr is completely undefined
@@ -72,19 +85,24 @@ transformed data {
 
 parameters {
   // beta is an array of vectors because entry goes to its own shard
-  vector[1] beta[L]; // latent effect
+  vector[1] beta[L-1]; // latent effect
   ordered[K - 1] c; // cut points
 }
 
 model {
   // prior
 
-  for (l in 1:L) {
+  vector[1] local[L];
+
+  for (l in 1:(L-1)) {
     beta[l] ~ normal(factr_mu, factr_sd);
   }
 
-  c ~ normal(cutpoint_mu, cutpoint_sd);
+  local[1] = rep_vector(0, 1);
+  local[2:L] = beta;
+
+  c ~ induced_dirichlet_lpdf(alpha, 0);
 
   // likelihood
-  target += sum(map_rect(lp, c, beta, xr, xi));
+  target += sum(map_rect(lp, c, local, xr, xi));
 }
