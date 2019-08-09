@@ -428,14 +428,13 @@ in `j` so that the next datapoint lands in the correct place.
       int xi[L, max(counts) + 1];  
       real xr[L, max(counts) + 1]; 
 
-      int<lower = 1> j = 2; 
+      int<lower = 1> j[L] = rep_array(2, L); 
+      xi[, 1] = counts;
       for (i in 1:N) {
         int shard = factr[i];
         xi[shard, j[shard]] = y[i];
         j[shard] += 1;
       }
-
-      xi[, 1] = counts;
     }
 
 I really like this way of creating shards because it doesn't become such
