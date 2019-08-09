@@ -1,9 +1,9 @@
 ---
-title: "Speeding up Bayesian sampling"
+title: "Speeding up Bayesian sampling with map_rect"
 author: "Brian Callander"
-date: "2019-08-08"
+date: "2019-08-09"
 tags: stan, map_rect, within-chain parallelisation, threading, ordinal regression
-tldr: "We implement threading for an ordinal regression model with one covariate in Stan. This gives us a 6x speedup. The mapped model allows for a different number of observations per shard. The indexing is drastically simplified by setting up one shard per factor level."
+tldr: "We implement threading for an ordinal regression model with one covariate in Stan. This gives us a >5x speedup. The mapped model allows for a different number of observations per shard. The indexing is drastically simplified by setting up one shard per factor level."
 always_allow_html: yes
 output:
   md_document:
@@ -85,7 +85,7 @@ Now we're all setup for threading.
 
 ## Generate the data
 
-Let's generate observations from the prior predictive distribution. Skip this section if you're just interested in the parallelisation. We'll use [the model](./models/ordinal_regression_betancourt.stan) described in [Michael Betancourt's](https://www.patreon.com/betanalpha/posts) [case study](https://betanalpha.github.io/assets/case_studies/ordinal_regression.html).
+Let's generate observations from the prior predictive distribution. Skip this section if you're just interested in the parallelisation. We'll a similar [model](./models/ordinal_regression_betancourt.stan) as described in [Michael Betancourt's](https://www.patreon.com/betanalpha/posts) [case study](https://betanalpha.github.io/assets/case_studies/ordinal_regression.html). The main difference is that we'll use contrast factors for our latent effect.
 
 ```{r dgp}
 m_sim <- "models/ordinal_regression_sim_betancourt.stan" %>% 
@@ -93,14 +93,14 @@ m_sim <- "models/ordinal_regression_sim_betancourt.stan" %>%
   stan_model()
 ```
 
-We'll generate 10,000 observations, where the only covariate is called `factr`, of which we have around 100 unique values. Notice that we will end up with a different number of observations for each level of `factr`.
+We'll generate 20,000 observations, where the only covariate is called `factr`, of which we have around 50 unique values. Notice that we will end up with a different number of observations for each level of `factr`.
 
 ```{r data}
 set.seed(12096)
 
-N <- 10000 # number of observations
+N <- 20000 # number of observations
 K <- 5     # number of ordinal outcomes
-L <- 100   # number of unique levels in our factor
+L <- 50    # number of unique levels in our factor
 
 # the covariates
 df_sim <- 1:L %>% 
@@ -118,7 +118,7 @@ data_sim <- list(
   # hyperparameters
   factr_mu = 0,
   factr_sd = 1,
-  alpha = c(1, 2, 4, 2, 1)
+  alpha = c(2, 4, 8, 4, 2)
 )
 ```
 
@@ -202,27 +202,27 @@ duration <- end - start
 
 The fitting took `r signif(as.numeric(duration, units = 'mins'), 2)` minutes. 
 
-Let's check the usual diagnostics.
+The HMC diagnostics look good.
 
 ```{r diagnostics, message=TRUE, warning=TRUE, error=TRUE}
 rstan::check_hmc_diagnostics(fit)
 ```
 
-The ESS and Rhat values also look good.
+The rhat is smaller than 1.05 and the bulk/tail ESS are over 100, which is good. 
 
 ```{r ess_rhat, echo=FALSE}
 fit %>% 
-  gather_draws(c[], beta[]) %>% 
+  gather_draws(c[i], beta[j]) %>% 
+  rename(variable = .variable) %>% 
   summarise(
     rhat = Rhat(.value),
     ess_bulk = ess_bulk(.value),
     ess_tail = ess_tail(.value)
   ) %>% 
-  group_by(.variable) %>% 
+  ungroup() %>% 
+  select(-i, -j) %>% 
+  group_by(variable) %>% 
   summarise_all(lst(min, max)) %>% 
-  gather(diagnostic, value, -.variable) %>% 
-  arrange(.variable, diagnostic) %>% 
-  rename(variable = .variable) %>% 
   kable(caption = "Max/min of ESS and Rhat diagnostics of the unmapped model", digits = 2) %>% 
   kable_styling(bootstrap_options = c("striped", "hover", "responsive"))
 ```
@@ -254,7 +254,7 @@ draws_beta <- fit %>%
   spread_draws(beta[factr_id]) 
 
 calibration <- draws_beta %>% 
-  mean_qi(.width = 0.5) %>% 
+  mean_qi(.width = 0.9) %>% 
   mutate(
     ground_truth = effects[factr_id], 
     hit = .lower <= ground_truth & ground_truth <= .upper
@@ -264,7 +264,7 @@ calibration <- draws_beta %>%
   percent()
 ```
 
-Around `r calibration` of the 100 50% intervals for β contained the true values.
+Around `r calibration` of the 90% intervals for β contained the true values. This is not bad considering that one error carries the weight of over 2 percentage points.
 
 ## The mapped model
 
@@ -329,7 +329,7 @@ fit_mapped <- m_mapped %>%
     chains = 1,
     warmup = 500,
     iter = 2000,
-    seed = 78176
+    seed = 98176
   )
 
 end_mapped <- Sys.time()
@@ -349,22 +349,22 @@ The HMC diagnostics look good.
 rstan::check_hmc_diagnostics(fit_mapped)
 ```
 
-Rhat and ESS also look good.
+The rhat and ESS values are still good.
 
 ```{r ess_rhat_mapped, echo=FALSE}
-fit_mapped %>% 
-  gather_draws(c[], beta[]) %>% 
+fit_mapped %>%  
+  gather_draws(c[i], beta[j]) %>% 
+  rename(variable = .variable) %>%
   summarise(
     rhat = Rhat(.value),
     ess_bulk = ess_bulk(.value),
     ess_tail = ess_tail(.value)
   ) %>% 
-  group_by(.variable) %>% 
+  ungroup() %>% 
+  select(-i, -j) %>% 
+  group_by(variable) %>% 
   summarise_all(lst(min, max)) %>% 
-  gather(diagnostic, value, -.variable) %>% 
-  arrange(.variable, diagnostic) %>% 
-  rename(variable = .variable) %>% 
-  kable(caption = "Max/min of ESS and Rhat diagnostics of the mapped model", digits = 2) %>% 
+  kable(caption = "Max/min of ESS and Rhat diagnostics of the mapped model", digits = 3) %>% 
   kable_styling(bootstrap_options = c("striped", "hover", "responsive"))
 ```
 
@@ -396,7 +396,7 @@ draws_beta_mapped <- fit_mapped %>%
   spread_draws(beta[factr_id]) 
 
 calibration_mapped <- draws_beta_mapped %>% 
-  mean_qi(.width = 0.5) %>% 
+  mean_qi(.width = 0.9) %>% 
   mutate(
     ground_truth = effects[factr_id], 
     hit = .lower <= ground_truth & ground_truth <= .upper
@@ -406,19 +406,19 @@ calibration_mapped <- draws_beta_mapped %>%
   percent()
 ```
 
-The level-effects are as well-calibrated as before, with around `r calibration` of the 100 50% intervals for β containing the true values.
+The level-effects are as well-calibrated as before, with around `r calibration` of the 90% intervals for β containing the true values.
 
 We can measure the similarity of the estimates in two ways:
 
 1. the absolute difference in the point estimates; and
-2. the ratio between the length of the overlap of the 50% intervals and the shortest 50% interval.
+2. the ratio between the length of the overlap of the two 90% intervals and the length of the shortest of the two 90% intervals.
 
-In each case the estimates look roughly the same, especially with respect to the ratio metric.
+In each case the estimates look roughly the same, especially with respect to the ratio metric. The differences are a bit larger than I would have expected, but I'm not so sure on what scale a 'good' difference would be. 
 
 ```{r comparison, echo=FALSE}
 comparisons <- draws_beta %>% 
-  mean_qi(.width = 0.5) %>% 
-  inner_join(draws_beta_mapped %>% mean_qi(.width = 0.5), by = 'factr_id') %>% 
+  mean_qi(.width = 0.9) %>% 
+  inner_join(draws_beta_mapped %>% mean_qi(.width = 0.9), by = 'factr_id') %>% 
   mutate(
     change = abs(beta.y - beta.x),
     
@@ -443,7 +443,9 @@ comparisons %>%
 
 ## Next steps
 
-I'm fairly happy with the speedup seen here. Actually, I'm mostly happy I got it working at all. It's entirely possible that creating 100 shards with only 4 threads to run them on isn't the most efficient way to use threading, but I'll keep doing it like this until there's a more convenient way to do it. Higher up in my priorities right now are:
+I'm fairly happy with the speedup seen here. Actually, I'm mostly happy I got it working at all. It's entirely possible that creating `r L` shards with only 4 threads to run them on isn't the most efficient way to use threading, but I'll keep doing it like this until there's a more convenient way to do it. Higher up in my priorities right now are:
 
 * adding more covariates, especially factors; and
 * putting a hierarchical prior on the factor; e.g. for use in [MRP](https://arxiv.org/abs/1906.11323).
+
+The bulk ESS values are a bit on the low side, so there could be a better way to parameterise the model.
