@@ -66,7 +66,7 @@ m1 <- data %>%
   map_dfr(posterior, grid1, .id = 'dataset')
 ```
 
-![](exercise_2M_files/figure-markdown/unnamed-chunk-3-1.svg)
+![Solution 2M1](exercise_2M_files/figure-markdown/unnamed-chunk-3-1.svg)
 
 The posterior becomes gradually more concentrated around the ground
 truth.
@@ -83,7 +83,7 @@ m2 <- data %>%
   map_dfr(posterior, grid2, .id = 'dataset')
 ```
 
-![](exercise_2M_files/figure-markdown/unnamed-chunk-5-1.svg)
+![Solution 2M2](exercise_2M_files/figure-markdown/unnamed-chunk-5-1.svg)
 
 Again we see the posterior concentrate more around the ground truth.
 Moreover, the distribution is more peaked (at \~ 0.003) than with the
