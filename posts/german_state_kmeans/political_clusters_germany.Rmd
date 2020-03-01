@@ -1,0 +1,154 @@
+---
+title: "Political Clusters in German States"
+author: "Brian Callander"
+date: "2020-03-01"
+tags: kmeans, map visualisation
+tldr: "Here's my solutions to the medium exercises in chapter 2 of McElreath's Statistical Rethinking, 1st edition."
+always_allow_html: yes
+output: 
+  md_document:
+    variant: markdown
+    preserve_yaml: yes
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(
+  echo = TRUE,
+  comment = NA,
+  message = TRUE,
+  warning = TRUE,
+  error = TRUE,
+  cache = FALSE,
+  dev = 'svglite',
+  fig.width = 6 ,
+  fig.height = 4 
+)
+
+library(tidyverse)
+library(here)
+library(scales)
+library(kableExtra)
+
+library(gganimate)
+
+theme_set(theme_minimal())
+
+set.seed(36414)
+```
+
+## Data
+
+```{r}
+ltw <- "data/letzte_landtagswahlergebnisse.csv" %>% 
+  here() %>% 
+  read_csv() %>% 
+  select(-letztewahl) %>% 
+  mutate(bundesland = bundesland %>% factor()) %>% 
+  filter(!is.na(bundesland))
+
+ltw
+```
+
+```{r}
+kld <- function(p, q) {
+  sum(p * (log2(p) - log2(q)), na.rm = TRUE)
+}
+
+jsd <- function(p, q) {
+  m <- 0.5 * (p + q)
+  0.5 * (kld(p, m) + kld(q, m))
+}
+
+political_similarities <- ltw %>% 
+  mutate(ergebnis = ergebnis / 100) %>% 
+  inner_join(., ., by = 'partei') %>% 
+  group_by(bundesland.x, bundesland.y) %>% 
+  summarise(
+    divergence = jsd(ergebnis.x, ergebnis.y),
+    distance = sum((ergebnis.x - ergebnis.y)^2)
+  ) %>% 
+  mutate(
+    divergence_rank = divergence %>% dense_rank() %>% ordered(),
+    distance_rank = distance %>% dense_rank() %>% ordered()
+  ) %>% 
+  ungroup() %>% 
+  # mutate(
+  #   divergence_norm = (divergence - min(divergence)) / (max(divergence) - min(divergence)),
+  # ) %>% 
+  arrange(divergence) 
+
+political_similarities
+
+```
+
+```{r, fig.height = 10, fig.width = 8, dpi=300}
+germany <- "data/DEU_adm1.shp" %>% 
+  here() %>% 
+  sf::st_read() %>% 
+  transmute(
+    bundesland = NAME_1 %>% factor(levels(ltw$bundesland)),
+    geometry
+  )
+```
+
+```{r, fig.height = 10, fig.width = 8, dpi=300}
+map_germany <- germany %>% 
+  inner_join(political_similarities, by = c("bundesland" = "bundesland.y")) 
+
+map_germany %>% 
+  filter(bundesland.x != 'Gesamt') %>%
+  ggplot() + 
+  aes(fill = fct_rev(divergence_rank)) + 
+  geom_sf(colour = 'white', size = 0.2) +
+  facet_wrap(~bundesland.x) + 
+  labs(
+    title = "Voting-similarity of the German states", 
+    subtitle = "Based on the Jensen-Shannon divergence of the most recent Landtagswahl results",
+    x = 'Lattitude',
+    y = 'Longitude',
+    fill = 'Similarity rank'
+  ) +
+  theme(axis.title = element_blank(), axis.text = element_blank())
+
+```
+
+
+```{r clusters, fig.height=8, fig.width=6}
+div_mat <- political_similarities %>%
+    filter_all(~!is.na(.x)) %>%
+    select(starts_with('bundesland.'), divergence) %>%
+    spread(bundesland.y, divergence, fill = 0) %>%
+    select(-bundesland.x)
+
+library(gganimate)
+
+germany %>%
+  crossing(k = 2:7) %>%
+  nest(-k) %>%
+  mutate(
+    km = map(k, ~kmeans(div_mat, .x)$cluster),
+    data = map2(data, km, ~mutate(.x, cluster = .y[as.integer(bundesland)]))
+  ) %>%
+  unnest(data) %>%
+  group_by(k, cluster) %>%
+  mutate(min_state = min(as.integer(bundesland))) %>%
+  ungroup() %>%
+  mutate(cluster = factor(dense_rank(min_state))) %>%
+  ggplot() +
+  aes(geometry = geometry, fill = cluster) +
+  geom_sf(colour = 'white', size = 0.2) +
+  # geom_sf_label(aes(label = bundesland)) +
+  labs(title = "Clusters") +
+  facet_wrap(~k, ncol = 2) +
+  theme(axis.title = element_blank(), axis.text = element_blank()) +
+  labs(
+    title = "K-means clusterings based on voting results",
+    subtitle = "For k = 2, ..., 7 clusters",
+    fill = 'Cluster'
+  ) +
+  NULL
+
+```
+
+
+
