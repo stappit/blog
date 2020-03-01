@@ -50,6 +50,10 @@ html, body
     color: #555;
 }
 
+#content div p.mathjaxWide:first-of-type {
+    display: none;
+}
+
 div.sourceCode { 
     background: linear-gradient(90deg, white, #f2f2f2, white);
     padding-top: 0.5em;
