@@ -11,7 +11,7 @@ output:
     preserve_yaml: yes
 ---
 
-Here's my solutions to the medium exercises in chapter 2 of McElreath's Statistical Rethinking, 1st edition. My intention is to move over to the 1nd edition when it comes out next month.
+Here's my solutions to the medium exercises in chapter 2 of McElreath's Statistical Rethinking, 1st edition. My intention is to move over to the 2nd edition when it comes out next month.
 
 <!--more-->
 
