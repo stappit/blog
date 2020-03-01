@@ -19,6 +19,7 @@ cabal-dev
 .cabal-sandbox/
 cabal.sandbox.config
 .stack-work/
+stack.yaml.lock
 
 #########
 # HAKYLL
