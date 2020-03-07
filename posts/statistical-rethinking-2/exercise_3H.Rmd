@@ -1,0 +1,185 @@
+---
+title: "SR2 Chapter 3 Hard"
+author: "Brian Callander"
+date: "2020-03-03"
+tags: statistical rethinking, solutions
+tldr: "Here's my solution to the hard exercises in chapter 3 of McElreath's Statistical Rethinking, 1st edition."
+always_allow_html: yes
+output: 
+  md_document:
+    variant: markdown
+    preserve_yaml: yes
+---
+
+Here's my solution to the hard exercises in chapter 3 of McElreath's Statistical Rethinking, 1st edition. 
+
+<!--more-->
+
+<div> 
+  $\DeclareMathOperator{\dbinomial}{Binomial}
+   \DeclareMathOperator{\dbernoulli}{Bernoulli}
+   \DeclareMathOperator{\dpoisson}{Poisson}
+   \DeclareMathOperator{\dnormal}{Normal}
+   \DeclareMathOperator{\dt}{t}
+   \DeclareMathOperator{\dcauchy}{Cauchy}
+   \DeclareMathOperator{\dexponential}{Exp}
+   \DeclareMathOperator{\duniform}{Uniform}
+   \DeclareMathOperator{\dgamma}{Gamma}
+   \DeclareMathOperator{\dinvpamma}{Invpamma}
+   \DeclareMathOperator{\invlogit}{InvLogit}
+   \DeclareMathOperator{\logit}{Logit}
+   \DeclareMathOperator{\ddirichlet}{Dirichlet}
+   \DeclareMathOperator{\dbeta}{Beta}$
+</div>
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(
+  echo = TRUE,
+  comment = NA,
+  message = FALSE,
+  warning = FALSE,
+  error = TRUE,
+  # cache = TRUE,
+  dev = "svglite"
+)
+
+library(tidyverse)
+library(scales)
+library(kableExtra)
+
+library(rethinking)
+
+theme_set(theme_minimal())
+
+set.seed(97367)
+```
+
+```{r}
+data(homeworkch3)
+
+granularity <- 1000
+
+h1_grid <- tibble(p = seq(0, 1, length.out = granularity)) %>% 
+  mutate(prior = 1)
+```
+
+```{r}
+df <- tibble(birth1 = birth1, birth2 = birth2) %>% 
+  mutate(birth = row_number())
+
+h1_counts <- df %>% 
+  gather(order, gender, -birth) %>% 
+  summarise(boys = sum(gender), births = n())
+
+posterior <- function(boys, total, grid) {
+  grid %>% 
+    mutate(
+      likelihood = dbinom(boys, total, p),
+      posterior = prior * likelihood,
+      posterior = posterior / sum(posterior)
+    )
+}
+
+h1_posterior <- posterior(h1_counts$boys, h1_counts$births, h1_grid) 
+
+h1_map <- h1_posterior %>% 
+  slice(which.max(posterior)) %>% 
+  pull(p)
+```
+
+
+```{r h1_posterior, fig.cap="Solution 3H1: posterior probability of giving birth to a boy."}
+h1_posterior %>% 
+  ggplot() +
+  aes(p, posterior) +
+  geom_area(fill = 'skyblue', colour = 'white') +
+  geom_vline(xintercept = h1_map, linetype = 'dashed', colour = 'chocolate', size = 1) +
+  labs(
+    x = 'Probability of a boy',
+    y = 'Probability density',
+    title = 'Posterior probability of giving birth to a boy',
+    subtitle = str_glue("MAP = {signif(h1_map, 3)}")
+  )
+
+```
+
+```{r}
+h2_samples <- h1_posterior %>% 
+  sample_n(10000, replace = TRUE, weight = posterior) %>% 
+  pull(p)
+
+h2_hpdi <- h2_samples %>% 
+  crossing(prob = c(0.5, 0.89, 0.97)) %>% 
+  group_by(prob) %>% 
+  group_map(HPDI) 
+
+h2_hpdi
+```
+
+
+```{r}
+h3_posterior_predictive <- rbinom(10000, 200, h2_samples)
+```
+
+
+```{r h3_posterior_predictive, fig.cap="Solution 3H3: the posterior predictive distribution for 200 births", echo = FALSE}
+h3_posterior_predictive %>% 
+  tibble(posterior_predictive = .) %>% 
+  ggplot() +
+  aes(posterior_predictive) +
+  geom_histogram() +
+  geom_vline(xintercept = h1_counts$boys, linetype = 'dashed', colour = 'chocolate', size = 1) +
+  scale_y_continuous(labels = comma) +
+  labs(
+    title = '3H3: the posterior predictive distribution for 200 births',
+    subtitle = "The dashed line indicates the observed number of boys in 200 births",
+    x = 'Number of boys in 200 births',
+    y = 'Proportion'
+  )
+```
+
+```{r}
+h4_posterior_predictive <- rbinom(10000, 100, h2_samples)
+```
+
+
+```{r h4_posterior_predictive, fig.cap="Solution 3H4: the posterior predictive distribution for 100 births", echo = FALSE}
+h4_posterior_predictive %>% 
+  tibble(posterior_predictive = .) %>% 
+  ggplot() +
+  aes(posterior_predictive) +
+  geom_histogram() +
+  geom_vline(xintercept = sum(df$birth1), linetype = 'dashed', colour = 'chocolate', size = 1) +
+  scale_y_continuous(labels = comma) +
+  labs(
+    title = '3H4: the posterior predictive distribution for 100 births',
+    subtitle = "The dashed line indicates the observed number of boys in 100 first-born births",
+    x = 'Number of boys in 100 births',
+    y = 'Proportion'
+  )
+```
+
+```{r}
+h5_counts <- df %>% 
+  filter(birth1 == 0) %>% 
+  summarise(boys = sum(birth2), births = n())
+
+h5_posterior_predictive <- rbinom(10000, h5_counts$births, h2_samples)
+```
+
+
+```{r h5_posterior_predictive, fig.cap="Solution 3H5: the posterior predictive distribution for 100 births", echo = FALSE}
+h5_posterior_predictive %>% 
+  tibble(posterior_predictive = .) %>% 
+  ggplot() +
+  aes(posterior_predictive) +
+  geom_histogram() +
+  geom_vline(xintercept = h5_counts$boys, linetype = 'dashed', colour = 'chocolate', size = 1) +
+  scale_y_continuous(labels = comma) +
+  labs(
+    title = str_glue('3H5: the posterior predictive distribution for {h5_counts$births} births'),
+    subtitle = str_glue("The dashed line indicates the observed number of boys following the {h5_counts$births} first-born girls"),
+    x = str_glue('Number of boys in {h5_counts$births} births'),
+    y = 'Proportion'
+  )
+```

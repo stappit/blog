@@ -1,0 +1,191 @@
+---
+title: "SR2 Chapter 3 Medium"
+author: "Brian Callander"
+date: "2020-03-03"
+tags: statistical rethinking, solutions
+tldr: "Here's my solution to the medium exercises in chapter 3 of McElreath's Statistical Rethinking, 1st edition."
+always_allow_html: yes
+output: 
+  md_document:
+    variant: markdown
+    preserve_yaml: yes
+---
+
+Here's my solution to the medium exercises in chapter 3 of McElreath's Statistical Rethinking, 1st edition. 
+
+<!--more-->
+
+<div> 
+  $\DeclareMathOperator{\dbinomial}{Binomial}
+   \DeclareMathOperator{\dbernoulli}{Bernoulli}
+   \DeclareMathOperator{\dpoisson}{Poisson}
+   \DeclareMathOperator{\dnormal}{Normal}
+   \DeclareMathOperator{\dt}{t}
+   \DeclareMathOperator{\dcauchy}{Cauchy}
+   \DeclareMathOperator{\dexponential}{Exp}
+   \DeclareMathOperator{\duniform}{Uniform}
+   \DeclareMathOperator{\dgamma}{Gamma}
+   \DeclareMathOperator{\dinvpamma}{Invpamma}
+   \DeclareMathOperator{\invlogit}{InvLogit}
+   \DeclareMathOperator{\logit}{Logit}
+   \DeclareMathOperator{\ddirichlet}{Dirichlet}
+   \DeclareMathOperator{\dbeta}{Beta}$
+</div>
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(
+  echo = TRUE,
+  comment = NA,
+  message = FALSE,
+  warning = FALSE,
+  error = TRUE,
+  # cache = TRUE,
+  dev = "svglite"
+)
+
+library(tidyverse)
+library(scales)
+library(kableExtra)
+
+library(rethinking)
+
+theme_set(theme_minimal())
+
+set.seed(97367)
+```
+
+```{r}
+p_true <- 0.7
+
+W <- 8
+N <- 15
+
+granularity <- 1000
+```
+
+## Uniform Prior
+
+
+```{r}
+m1_grid <- tibble(p = seq(0, 1, length.out = granularity)) %>% 
+  mutate(prior = 1)
+
+m1_posterior <- m1_grid %>% 
+  mutate(
+    likelihood = dbinom(W, N, p),
+    posterior = prior * likelihood
+  )
+```
+
+```{r}
+m1_posterior %>% 
+  ggplot() +
+  aes(p, posterior) +
+  geom_area(fill = 'skyblue', colour = 'white')
+```
+
+```{r}
+m2_samples <- m1_posterior %>% 
+  sample_n(10000, replace = T, weight = posterior)
+
+m2_hpdi <- HPDI(m2_samples$p, prob = 0.9)
+m2_hpdi
+```
+
+```{r}
+m2_samples %>% 
+  ggplot() +
+  aes(p) + 
+  geom_histogram() 
+```
+
+```{r}
+m3_prob <- m2_samples %>% 
+  mutate(W = rbinom(n(), 15, p)) %>% 
+  group_by(W) %>% 
+  tally() %>% 
+  mutate(probability = n / sum(n))
+
+m3_prob %>% 
+  ggplot() +
+  aes(W, probability) +
+  geom_col() +
+  scale_x_continuous(breaks = seq(0, 16, 4))
+```
+
+```{r}
+m4_prob <- m2_samples %>% 
+  mutate(W = rbinom(n(), 9, p)) %>% 
+  group_by(W) %>% 
+  tally() %>% 
+  mutate(probability = n / sum(n))
+
+m4_prob %>% 
+  ggplot() +
+  aes(W, probability) +
+  geom_col() +
+  scale_x_continuous(breaks = seq(0, 16, 3))
+```
+
+## Step Prior
+
+```{r}
+m5_grid <- m1_grid %>% 
+  mutate(prior = if_else(p < 0.5, 0, 1))
+
+m5_posterior <- m5_grid %>% 
+  mutate(
+    likelihood = dbinom(W, N, p),
+    posterior = prior * likelihood
+  )
+```
+
+```{r}
+m5_posterior %>% 
+  ggplot() +
+  aes(p, posterior) +
+  geom_area(fill = 'skyblue', colour = 'white')
+```
+
+```{r}
+m5_samples <- m5_posterior %>% 
+  sample_n(10000, replace = T, weight = posterior)
+
+m5_hpdi <- HPDI(m5_samples$p, prob = 0.9)
+m5_hpdi
+```
+
+```{r}
+m5_samples %>% 
+  ggplot() +
+  aes(p) + 
+  geom_histogram() 
+```
+
+```{r}
+m5_prob <- m5_samples %>% 
+  mutate(W = rbinom(n(), 15, p)) %>% 
+  group_by(W) %>% 
+  tally() %>% 
+  mutate(probability = n / sum(n))
+
+m5_prob %>% 
+  ggplot() +
+  aes(W, probability) +
+  geom_col() +
+  scale_x_continuous(breaks = seq(0, 16, 4))
+```
+
+```{r}
+m5_prob <- m5_samples %>% 
+  mutate(W = rbinom(n(), 9, p)) %>% 
+  group_by(W) %>% 
+  tally() %>% 
+  mutate(probability = n / sum(n))
+
+m5_prob %>% 
+  ggplot() +
+  aes(W, probability) +
+  geom_col() +
+  scale_x_continuous(breaks = seq(0, 16, 3))
+```
