@@ -12,11 +12,11 @@ tags: |
 title: SR2 Chapter 3 Medium
 tldr: |
     Here's my solution to the medium exercises in chapter 3 of McElreath's
-    Statistical Rethinking, 2st edition.
+    Statistical Rethinking, 2nd edition.
 ---
 
 Here's my solution to the medium exercises in chapter 3 of McElreath's
-Statistical Rethinking, 2st edition.
+Statistical Rethinking, 2nd edition.
 
 <!--more-->
 <div>

@@ -1,9 +1,9 @@
 ---
 title: "SR2 Chapter 3 Hard"
 author: "Brian Callander"
-date: "2020-03-03"
-tags: statistical rethinking, solutions
-tldr: "Here's my solution to the hard exercises in chapter 3 of McElreath's Statistical Rethinking, 1st edition."
+date: "2020-04-05"
+tags: statistical rethinking, solutions, grid approximation, posterior predictive check, posterior predictive distribution, map, binomial, hpdi
+tldr: "Here's my solution to the hard exercises in chapter 3 of McElreath's Statistical Rethinking, 2nd edition."
 always_allow_html: yes
 output: 
   md_document:
@@ -11,7 +11,7 @@ output:
     preserve_yaml: yes
 ---
 
-Here's my solution to the hard exercises in chapter 3 of McElreath's Statistical Rethinking, 1st edition. 
+Here's my solutions to the hard exercises in chapter 3 of McElreath's Statistical Rethinking, 2nd edition. 
 
 <!--more-->
 
@@ -51,44 +51,63 @@ library(rethinking)
 
 theme_set(theme_minimal())
 
-set.seed(97367)
+set.seed(60326)
 ```
 
-```{r}
+Let's first put the data into a tibble for easier manipulation later.
+
+```{r data}
 data(homeworkch3)
 
+df <- tibble(birth1 = birth1, birth2 = birth2) %>% 
+  mutate(birth = row_number())
+```
+
+```{r data_table, echo=F}
+df %>% 
+  head() %>% 
+  kable(caption = "The first few rows of the data.") %>% 
+  kable_styling(bootstrap_options = c("striped", "hover", "responsive"))
+```
+
+## 3H1
+
+Let's check we have the correct total cound and the correct number of boys.
+
+```{r}
+h1_counts <- df %>% 
+  gather(order, gender, -birth) %>% 
+  summarise(boys = sum(gender), births = n())
+```
+
+Now we can grid approximate the posterior as before.
+
+```{r h1_posterior}
 granularity <- 1000
 
 h1_grid <- tibble(p = seq(0, 1, length.out = granularity)) %>% 
   mutate(prior = 1)
+
+h1_posterior <- h1_grid %>% 
+  mutate(
+    likelihood = dbinom(h1_counts$boys, h1_counts$births, p),
+    posterior = prior * likelihood,
+    posterior = posterior / sum(posterior)
+  )
 ```
 
-```{r}
-df <- tibble(birth1 = birth1, birth2 = birth2) %>% 
-  mutate(birth = row_number())
+The maximum a posteriori (MAP) value is the value of p that maximises the posterior.
 
-h1_counts <- df %>% 
-  gather(order, gender, -birth) %>% 
-  summarise(boys = sum(gender), births = n())
-
-posterior <- function(boys, total, grid) {
-  grid %>% 
-    mutate(
-      likelihood = dbinom(boys, total, p),
-      posterior = prior * likelihood,
-      posterior = posterior / sum(posterior)
-    )
-}
-
-h1_posterior <- posterior(h1_counts$boys, h1_counts$births, h1_grid) 
-
+```{r h1}
 h1_map <- h1_posterior %>% 
   slice(which.max(posterior)) %>% 
   pull(p)
+
+h1_map
 ```
 
 
-```{r h1_posterior, fig.cap="Solution 3H1: posterior probability of giving birth to a boy."}
+```{r h1_posterior_plot, echo=F, fig.cap="Solution 3H1: posterior probability of giving birth to a boy."}
 h1_posterior %>% 
   ggplot() +
   aes(p, posterior) +
@@ -97,13 +116,17 @@ h1_posterior %>%
   labs(
     x = 'Probability of a boy',
     y = 'Probability density',
-    title = 'Posterior probability of giving birth to a boy',
-    subtitle = str_glue("MAP = {signif(h1_map, 3)}")
+    title = '3H1: Posterior probability of giving birth to a boy',
+    subtitle = str_glue("The dashed line indicates the MAP = {signif(h1_map, 3)}")
   )
 
 ```
 
-```{r}
+## 3H2
+
+We draw samples with weight equalt to the posterior. We then apply the `HPDI` function to these samples, each time with a different width.
+
+```{r h2}
 h2_samples <- h1_posterior %>% 
   sample_n(10000, replace = TRUE, weight = posterior) %>% 
   pull(p)
@@ -116,13 +139,16 @@ h2_hpdi <- h2_samples %>%
 h2_hpdi
 ```
 
+## 3H3
 
-```{r}
+The posterior predictive samples are possible observations according to our posterior.
+
+```{r h3_posterior_predictive}
 h3_posterior_predictive <- rbinom(10000, 200, h2_samples)
 ```
 
 
-```{r h3_posterior_predictive, fig.cap="Solution 3H3: the posterior predictive distribution for 200 births", echo = FALSE}
+```{r h3_plot, fig.cap="Solution 3H3: the posterior predictive distribution for 200 births", echo = FALSE}
 h3_posterior_predictive %>% 
   tibble(posterior_predictive = .) %>% 
   ggplot() +
@@ -138,12 +164,18 @@ h3_posterior_predictive %>%
   )
 ```
 
-```{r}
+The number of observed births is very close to the MAP of the posterior predictive distribution, suggesting we have a decent fit.
+
+## 3H4
+
+Our data are from birth pairs and so far we didn't make any distinction between the first and second births. To test this assumption, we can perform a posterior predictive check as in 3H3, but this time for first births.
+
+```{r h4_posterior_predictive}
 h4_posterior_predictive <- rbinom(10000, 100, h2_samples)
 ```
 
 
-```{r h4_posterior_predictive, fig.cap="Solution 3H4: the posterior predictive distribution for 100 births", echo = FALSE}
+```{r h4_posterior_predictive_plot, fig.cap="Solution 3H4: the posterior predictive distribution for 100 births", echo = FALSE}
 h4_posterior_predictive %>% 
   tibble(posterior_predictive = .) %>% 
   ggplot() +
@@ -159,7 +191,13 @@ h4_posterior_predictive %>%
   )
 ```
 
-```{r}
+The fit doesn't look quite as good for first births as it did for all births together. It also doesn't look bad since there is still a fair bit of probability mass around the observed number of first birth boys.
+
+## 3H5
+
+As the final posterior predictive check, let's check the number of boys born after a girl.
+
+```{r h5}
 h5_counts <- df %>% 
   filter(birth1 == 0) %>% 
   summarise(boys = sum(birth2), births = n())
@@ -183,3 +221,5 @@ h5_posterior_predictive %>%
     y = 'Proportion'
   )
 ```
+
+The fit here looks bad, since the observed number of boys is higher than the bulk of the model's expectations.
